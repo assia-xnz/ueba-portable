@@ -1,0 +1,57 @@
+# Configuration du pipeline UEBA
+# ================================
+# Ce fichier externalise tous les paramètres ajustables du pipeline,
+# afin d'éviter de coder en dur des valeurs métier dans le domaine.
+
+siem:
+  # Adapter à utiliser : wazuh | elastic | splunk | qradar
+  adapter: wazuh
+  # Format du timestamp tel qu'exporté par Kibana Discover
+  timestamp_format: "%b %d, %Y @ %H:%M:%S.%f"
+
+windowing:
+  # Fenêtres glissantes (sliding windows) pour l'extraction de features
+  size_minutes: 60
+  step_minutes: 30
+
+baseline:
+  # Nombre de jours d'historique utilisés pour construire la baseline par utilisateur
+  lookback_days: 7
+  # Nombre minimum d'observations requises pour qu'une baseline soit jugée fiable
+  min_observations: 5
+
+business_hours:
+  # Plage horaire "normale" utilisée pour calculer off_hours_ratio
+  start_hour: 8
+  end_hour: 18
+
+excluded_accounts:
+  # Comptes machine / système à exclure systématiquement (réduction des FP - levier 1)
+  suffixes:
+    - "$"
+  exact_names:
+    - "SYSTEM"
+    - "LOCAL SERVICE"
+    - "NETWORK SERVICE"
+    - "ANONYMOUS LOGON"
+  prefixes:
+    - "DWM-"
+    - "UMFD-"
+
+ensemble:
+  isolation_forest:
+    n_estimators: 200
+    random_state: 42
+  one_class_svm:
+    kernel: rbf
+    gamma: scale
+  autoencoder:
+    hidden_layer_sizes: [8, 4, 8]
+    reconstruction_error_percentile: 95
+    random_state: 42
+  # Nombre minimum de votes "anomalie" parmi les 3 modèles pour déclencher une alerte
+  majority_threshold: 2
+
+output:
+  processed_dir: "data/processed"
+  report_filename: "detection_report.json"

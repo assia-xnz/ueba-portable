@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "ueba-portable"
+version = "0.1.0"
+description = "Système UEBA portable pour la chasse aux menaces, basé sur l'apprentissage automatique non supervisé, intégré à un SIEM et mappé au framework MITRE ATT&CK"
+authors = ["assia-xnz <sia.el2020@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "ueba", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pandas = "^2.2"
+numpy = "^1.26"
+scikit-learn = "^1.5"
+pyyaml = "^6.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+pytest-cov = "^5.0"
+black = "^24.4"
+ruff = "^0.5"
+mypy = "^1.10"
+types-pyyaml = "^6.0"
+
+[tool.poetry.scripts]
+ueba = "ueba.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src/ueba"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src/ueba --cov-report=term-missing"
+
+[tool.coverage.run]
+branch = true
+source = ["src/ueba"]
