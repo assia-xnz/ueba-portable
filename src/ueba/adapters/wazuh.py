@@ -35,6 +35,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 
+from dateutil import parser as dateutil_parser
+
 from ueba.adapters.base import AdapterParsingError, SIEMAdapter, clean_field, clean_int_field
 from ueba.domain.schema import PROCESS_CREATION_EVENT_ID, NormalizedEvent
 
@@ -117,7 +119,10 @@ class WazuhAdapter(SIEMAdapter):
         if text is None:
             raise AdapterParsingError("Timestamp manquant ou vide")
         try:
-            return datetime.strptime(text, KIBANA_TIMESTAMP_FORMAT)
+            # Le format Kibana Discover contient ' @ ' (ex: "May 13, 2026 @ 11:08:16.256")
+            # que dateutil ne reconnaît pas — on le remplace par un espace avant parsing.
+            normalized = text.replace(" @ ", " ")
+            return dateutil_parser.parse(normalized, dayfirst=False).replace(tzinfo=None)
         except ValueError as exc:
             raise AdapterParsingError(f"Timestamp non parsable: {text!r}") from exc
 

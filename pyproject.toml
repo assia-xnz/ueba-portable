@@ -54,6 +54,7 @@ files = ["src/ueba"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=src/ueba --cov-report=term-missing"
+pythonpath = ["src"]
 
 [tool.coverage.run]
 branch = true

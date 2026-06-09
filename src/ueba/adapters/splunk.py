@@ -29,6 +29,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 
+from dateutil import parser as dateutil_parser
+
 from ueba.adapters.base import AdapterParsingError, SIEMAdapter, clean_field
 from ueba.domain.schema import PROCESS_CREATION_EVENT_ID, NormalizedEvent
 
@@ -112,12 +114,10 @@ class SplunkAdapter(SIEMAdapter):
         text = clean_field(raw_timestamp)
         if text is None:
             raise AdapterParsingError("Timestamp manquant ou vide")
-        for fmt in SPLUNK_TIMESTAMP_FORMATS:
-            try:
-                return datetime.strptime(text, fmt).replace(tzinfo=None)
-            except ValueError:
-                continue
-        raise AdapterParsingError(f"Timestamp non parsable: {text!r}")
+        try:
+            return dateutil_parser.parse(text, dayfirst=False).replace(tzinfo=None)
+        except ValueError as exc:
+            raise AdapterParsingError(f"Timestamp non parsable: {text!r}") from exc
 
 
 __all__ = ["SPLUNK_TIMESTAMP_FORMATS", "SplunkAdapter"]
