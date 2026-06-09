@@ -1,4 +1,7 @@
-"""Tests unitaires de la couche adapters : contrat abstrait, Wazuh, Elastic, Splunk, QRadar, registry."""
+"""Tests unitaires de la couche adapters.
+
+Contrat abstrait, Wazuh, Elastic, Splunk, QRadar, registry.
+"""
 
 from collections.abc import Mapping
 from datetime import datetime
@@ -111,11 +114,13 @@ class TestWazuhAdapter:
 
     def test_process_creation_event_uses_subject_user_name(self, adapter: WazuhAdapter) -> None:
         """Particularité Windows : pour 4688, l'utilisateur réel est dans subjectUserName."""
-        record = _wazuh_record(**{
-            "data.win.system.eventID": "4688",
-            "data.win.eventdata.targetUserName": "",
-            "data.win.eventdata.subjectUserName": "l.idrissi",
-        })
+        record = _wazuh_record(
+            **{
+                "data.win.system.eventID": "4688",
+                "data.win.eventdata.targetUserName": "",
+                "data.win.eventdata.subjectUserName": "l.idrissi",
+            }
+        )
         event = adapter.parse_record(record)
         assert event is not None
         assert event.user == "l.idrissi"
@@ -149,18 +154,24 @@ class TestWazuhAdapter:
         with pytest.raises(AdapterParsingError):
             adapter.parse_record(record)
 
-    def test_normalize_excludes_machine_accounts_via_subject_user_name(self, adapter: WazuhAdapter) -> None:
+    def test_normalize_excludes_machine_accounts_via_subject_user_name(
+        self, adapter: WazuhAdapter
+    ) -> None:
         records = [
-            _wazuh_record(**{
-                "data.win.system.eventID": "4688",
-                "data.win.eventdata.targetUserName": "",
-                "data.win.eventdata.subjectUserName": "SOC-ENDPOINT01$",
-            }),
-            _wazuh_record(**{
-                "data.win.system.eventID": "4688",
-                "data.win.eventdata.targetUserName": "",
-                "data.win.eventdata.subjectUserName": "y.ben",
-            }),
+            _wazuh_record(
+                **{
+                    "data.win.system.eventID": "4688",
+                    "data.win.eventdata.targetUserName": "",
+                    "data.win.eventdata.subjectUserName": "SOC-ENDPOINT01$",
+                }
+            ),
+            _wazuh_record(
+                **{
+                    "data.win.system.eventID": "4688",
+                    "data.win.eventdata.targetUserName": "",
+                    "data.win.eventdata.subjectUserName": "y.ben",
+                }
+            ),
         ]
         events = adapter.normalize(records)
         assert [e.user for e in events] == ["y.ben"]
@@ -234,11 +245,13 @@ class TestElasticAdapter:
         assert event.user == "a.amrani"
 
     def test_process_creation_event_uses_subject_user_name(self, adapter: ElasticAdapter) -> None:
-        record = _ecs_record(**{
-            "event.code": "4688",
-            "winlog.event_data.TargetUserName": "",
-            "winlog.event_data.SubjectUserName": "l.idrissi",
-        })
+        record = _ecs_record(
+            **{
+                "event.code": "4688",
+                "winlog.event_data.TargetUserName": "",
+                "winlog.event_data.SubjectUserName": "l.idrissi",
+            }
+        )
         event = adapter.parse_record(record)
         assert event is not None
         assert event.user == "l.idrissi"
@@ -302,11 +315,13 @@ class TestSplunkAdapter:
         assert event.user == "a.amrani"
 
     def test_process_creation_event_uses_subject_user_name(self, adapter: SplunkAdapter) -> None:
-        record = _splunk_record(**{
-            "EventCode": "4688",
-            "TargetUserName": "",
-            "SubjectUserName": "y.ben",
-        })
+        record = _splunk_record(
+            **{
+                "EventCode": "4688",
+                "TargetUserName": "",
+                "SubjectUserName": "y.ben",
+            }
+        )
         event = adapter.parse_record(record)
         assert event is not None
         assert event.user == "y.ben"
@@ -370,11 +385,13 @@ class TestQRadarAdapter:
         assert event.user == "a.amrani"
 
     def test_process_creation_event_uses_subject_username(self, adapter: QRadarAdapter) -> None:
-        record = _qradar_record(**{
-            "qid": "4688",
-            "targetusername": "",
-            "subjectusername": "k.alaa",
-        })
+        record = _qradar_record(
+            **{
+                "qid": "4688",
+                "targetusername": "",
+                "subjectusername": "k.alaa",
+            }
+        )
         event = adapter.parse_record(record)
         assert event is not None
         assert event.user == "k.alaa"
@@ -415,7 +432,9 @@ class TestAdapterRegistry:
             ("qradar", QRadarAdapter),
         ],
     )
-    def test_get_adapter_returns_expected_type(self, adapter_name: str, expected_type: type) -> None:
+    def test_get_adapter_returns_expected_type(
+        self, adapter_name: str, expected_type: type
+    ) -> None:
         adapter = get_adapter(adapter_name)
         assert isinstance(adapter, expected_type)
 
@@ -431,5 +450,7 @@ class TestAdapterRegistry:
         custom_filter = MachineAccountFilter(exact_names=["a.amrani"])
         adapter = get_adapter("wazuh", machine_account_filter=custom_filter)
 
-        events = adapter.normalize([_wazuh_record(**{"data.win.eventdata.targetUserName": "a.amrani"})])
+        events = adapter.normalize(
+            [_wazuh_record(**{"data.win.eventdata.targetUserName": "a.amrani"})]
+        )
         assert events == []

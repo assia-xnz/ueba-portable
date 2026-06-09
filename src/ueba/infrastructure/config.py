@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -139,7 +140,7 @@ class PipelineConfig:
     report_filename: str = "detection_report.json"
 
 
-def _require(mapping: dict, *keys: str) -> dict:
+def _require(mapping: dict[str, Any], *keys: str) -> Any:
     """Navigue dans un dictionnaire imbriqué et lève `ConfigError` si une clé manque."""
     current = mapping
     path: list[str] = []

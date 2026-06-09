@@ -164,9 +164,7 @@ class MachineAccountFilter:
             return True
         if any(normalized.endswith(suffix) for suffix in self._suffixes):
             return True
-        if any(normalized.upper().startswith(prefix.upper()) for prefix in self._prefixes):
-            return True
-        return False
+        return any(normalized.upper().startswith(prefix.upper()) for prefix in self._prefixes)
 
     @classmethod
     def default(cls) -> MachineAccountFilter:

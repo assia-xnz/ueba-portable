@@ -36,10 +36,10 @@ from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
-from sklearn.ensemble import IsolationForest
-from sklearn.neural_network import MLPRegressor
-from sklearn.preprocessing import RobustScaler
-from sklearn.svm import OneClassSVM
+from sklearn.ensemble import IsolationForest  # type: ignore[import-untyped]
+from sklearn.neural_network import MLPRegressor  # type: ignore[import-untyped]
+from sklearn.preprocessing import RobustScaler  # type: ignore[import-untyped]
+from sklearn.svm import OneClassSVM  # type: ignore[import-untyped]
 
 #: Nombre de modèles constituant l'ensemble (IsolationForest, OneClassSVM, Autoencoder).
 ENSEMBLE_SIZE: int = 3
@@ -115,7 +115,9 @@ class AnomalyEnsemble:
         self._reconstruction_error_percentile = reconstruction_error_percentile
 
         self._scaler = RobustScaler()
-        self._isolation_forest = IsolationForest(n_estimators=n_estimators, random_state=random_state)
+        self._isolation_forest = IsolationForest(
+            n_estimators=n_estimators, random_state=random_state
+        )
         self._one_class_svm = OneClassSVM(kernel=svm_kernel, gamma=svm_gamma)
         self._autoencoder = MLPRegressor(
             hidden_layer_sizes=autoencoder_hidden_layers,
@@ -205,10 +207,12 @@ class AnomalyEnsemble:
         return verdicts
 
     def _autoencoder_votes(self, scaled: npt.NDArray[np.float64]) -> npt.NDArray[np.bool_]:
-        """Détermine, pour chaque observation, si l'erreur de reconstruction dépasse le seuil appris."""
-        reconstruction = self._autoencoder.predict(scaled)
-        errors = np.mean((scaled - reconstruction) ** 2, axis=1)
-        return errors > self._reconstruction_error_threshold
+        """Détermine, pour chaque observation, si l'erreur de reconstruction
+        dépasse le seuil appris."""
+        reconstruction: npt.NDArray[np.float64] = self._autoencoder.predict(scaled)
+        errors: npt.NDArray[np.float64] = np.mean((scaled - reconstruction) ** 2, axis=1)
+        result: npt.NDArray[np.bool_] = errors > self._reconstruction_error_threshold
+        return result
 
 
 __all__ = ["ENSEMBLE_SIZE", "AnomalyEnsemble", "EnsembleVerdict"]

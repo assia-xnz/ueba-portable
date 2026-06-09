@@ -30,7 +30,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 
-from dateutil import parser as dateutil_parser
+from dateutil import parser as dateutil_parser  # type: ignore[import-untyped]
 
 from ueba.adapters.base import AdapterParsingError, SIEMAdapter, clean_field, clean_int_field
 from ueba.domain.schema import PROCESS_CREATION_EVENT_ID, NormalizedEvent
@@ -117,7 +117,8 @@ class QRadarAdapter(SIEMAdapter):
         if text is None:
             raise AdapterParsingError("Timestamp manquant ou vide")
         try:
-            return dateutil_parser.parse(text, dayfirst=False).replace(tzinfo=None)
+            parsed: datetime = dateutil_parser.parse(text, dayfirst=False)
+            return parsed.replace(tzinfo=None)
         except ValueError as exc:
             raise AdapterParsingError(f"Timestamp non parsable: {text!r}") from exc
 

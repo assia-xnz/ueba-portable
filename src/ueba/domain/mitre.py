@@ -41,6 +41,7 @@ def _window_bucket(dt: datetime, step_minutes: int = 30) -> tuple[int, int, int,
     bucketed_minute = (dt.minute // step_minutes) * step_minutes
     return (dt.year, dt.month, dt.day, dt.hour, bucketed_minute)
 
+
 #: Seuils heuristiques au-delà desquels une feature est jugée « élevée ».
 #: Calibrés empiriquement sur l'export de validation (14 jours, 9 utilisateurs).
 FAILED_LOGIN_COUNT_THRESHOLD: float = 5.0
@@ -87,9 +88,7 @@ class MitreMatch:
 
 # Table déclarative des heuristiques individuelles (par utilisateur × fenêtre).
 # Chaque entrée associe un prédicat sur le FeatureVector à une technique MITRE.
-_INDIVIDUAL_HEURISTICS: tuple[
-    tuple[str, str, str, str, str], ...
-] = (
+_INDIVIDUAL_HEURISTICS: tuple[tuple[str, str, str, str, str], ...] = (
     # (technique_id, technique_name, tactic, feature_attr, rationale_template)
     (
         "T1110",
@@ -191,7 +190,13 @@ class MitreMapper:
                 )
             )
 
-        for technique_id, technique_name, tactic, attribute, rationale_template in _INDIVIDUAL_HEURISTICS:
+        for (
+            technique_id,
+            technique_name,
+            tactic,
+            attribute,
+            rationale_template,
+        ) in _INDIVIDUAL_HEURISTICS:
             value = getattr(feature_vector, attribute)
             threshold = _HEURISTIC_THRESHOLDS[attribute]
             if value > threshold:
@@ -215,9 +220,10 @@ class MitreMapper:
                     technique_name="Valid Accounts",
                     tactic="Defense Evasion",
                     rationale=(
-                        f"Activité hors heures de bureau (ratio={feature_vector.off_hours_ratio:.2f}) "
-                        f"combinée à un nombre élevé d'hôtes distincts "
-                        f"({feature_vector.unique_hosts:.0f})"
+                        "Activité hors heures de bureau"
+                        f" (ratio={feature_vector.off_hours_ratio:.2f})"
+                        " combinée à un nombre élevé d'hôtes distincts"
+                        f" ({feature_vector.unique_hosts:.0f})"
                     ),
                     source="heuristic",
                 )
@@ -248,13 +254,13 @@ class MitreMapper:
         """
         # Groupe par bucket de 30 min (pas exact) pour gérer les fenêtres par utilisateur
         # dont les window_start diffèrent de quelques secondes selon le premier événement.
-        by_bucket: dict[tuple, list[FeatureVector]] = defaultdict(list)
+        by_bucket: dict[tuple[int, ...], list[FeatureVector]] = defaultdict(list)
         for vector in anomalous_vectors:
             if vector.failed_login_count >= PASSWORD_SPRAY_MIN_FAILED_LOGINS:
                 by_bucket[_window_bucket(vector.window_start)].append(vector)
 
         matches: list[MitreMatch] = []
-        for bucket_key, vectors in sorted(by_bucket.items()):
+        for _bucket_key, vectors in sorted(by_bucket.items()):
             distinct_users = {v.user for v in vectors}
             if len(distinct_users) >= PASSWORD_SPRAY_MIN_USERS:
                 window_start = min(v.window_start for v in vectors)

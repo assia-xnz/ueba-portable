@@ -46,7 +46,9 @@ class TestIndividualHeuristics:
         techniques = {m.technique_id for m in mapper.match_individual(vector)}
         assert "T1059" in techniques
 
-    def test_off_hours_and_unique_hosts_combo_maps_to_valid_accounts(self, mapper: MitreMapper) -> None:
+    def test_off_hours_and_unique_hosts_combo_maps_to_valid_accounts(
+        self, mapper: MitreMapper
+    ) -> None:
         vector = _vector(off_hours_ratio=0.8, unique_hosts=4.0)
         techniques = {m.technique_id for m in mapper.match_individual(vector)}
         assert "T1078" in techniques
@@ -118,11 +120,15 @@ class TestPasswordSprayingDetection:
         assert "a.amrani" in matches[0].rationale
         assert "y.ben" in matches[0].rationale
 
-    def test_single_user_high_failures_is_not_classified_as_spraying(self, mapper: MitreMapper) -> None:
+    def test_single_user_high_failures_is_not_classified_as_spraying(
+        self, mapper: MitreMapper
+    ) -> None:
         vectors = [_vector(user="a.amrani", failed_login_count=20.0)]
         assert mapper.match_population(vectors) == []
 
-    def test_few_users_below_threshold_is_not_classified_as_spraying(self, mapper: MitreMapper) -> None:
+    def test_few_users_below_threshold_is_not_classified_as_spraying(
+        self, mapper: MitreMapper
+    ) -> None:
         vectors = [
             _vector(user="a.amrani", failed_login_count=3.0),
             _vector(user="l.idrissi", failed_login_count=3.0),

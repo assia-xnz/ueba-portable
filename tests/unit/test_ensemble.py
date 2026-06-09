@@ -71,7 +71,9 @@ class TestAnomalyEnsembleDetection:
         ensemble.fit(_make_normal_population(n=150))
         return ensemble
 
-    def test_normal_observations_are_mostly_not_flagged(self, fitted_ensemble: AnomalyEnsemble) -> None:
+    def test_normal_observations_are_mostly_not_flagged(
+        self, fitted_ensemble: AnomalyEnsemble
+    ) -> None:
         normal = _make_normal_population(n=40, seed=7)
         verdicts = fitted_ensemble.predict(normal)
 
@@ -79,7 +81,9 @@ class TestAnomalyEnsembleDetection:
         # La grande majorité des observations « normales » ne doit pas être signalée
         assert anomaly_ratio < 0.25
 
-    def test_extreme_outliers_are_flagged_as_anomalies(self, fitted_ensemble: AnomalyEnsemble) -> None:
+    def test_extreme_outliers_are_flagged_as_anomalies(
+        self, fitted_ensemble: AnomalyEnsemble
+    ) -> None:
         outliers = _make_extreme_outliers(n=5)
         verdicts = fitted_ensemble.predict(outliers)
 

@@ -43,7 +43,9 @@ class UnknownAdapterError(Exception):
         self.name = name
 
 
-def get_adapter(name: str, machine_account_filter: MachineAccountFilter | None = None) -> SIEMAdapter:
+def get_adapter(
+    name: str, machine_account_filter: MachineAccountFilter | None = None
+) -> SIEMAdapter:
     """Résout et instancie l'adapter SIEM correspondant au nom fourni.
 
     Paramètres

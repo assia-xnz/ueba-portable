@@ -9,25 +9,35 @@ class TestUserBaselineRobustZScore:
     """Vérifie le calcul du z-score robuste médiane/MAD."""
 
     def test_value_equal_to_median_has_zero_z_score(self) -> None:
-        baseline = UserBaseline(user="a.amrani", metric="login_count", median=5.0, mad=1.0, n_observations=10)
+        baseline = UserBaseline(
+            user="a.amrani", metric="login_count", median=5.0, mad=1.0, n_observations=10
+        )
         assert baseline.robust_z_score(5.0) == 0.0
 
     def test_value_above_median_has_positive_z_score(self) -> None:
-        baseline = UserBaseline(user="a.amrani", metric="login_count", median=5.0, mad=1.0, n_observations=10)
+        baseline = UserBaseline(
+            user="a.amrani", metric="login_count", median=5.0, mad=1.0, n_observations=10
+        )
         assert baseline.robust_z_score(8.0) > 0
 
     def test_value_below_median_has_negative_z_score(self) -> None:
-        baseline = UserBaseline(user="a.amrani", metric="login_count", median=5.0, mad=1.0, n_observations=10)
+        baseline = UserBaseline(
+            user="a.amrani", metric="login_count", median=5.0, mad=1.0, n_observations=10
+        )
         assert baseline.robust_z_score(2.0) < 0
 
     def test_zero_mad_does_not_raise_division_by_zero(self) -> None:
-        baseline = UserBaseline(user="a.amrani", metric="login_count", median=1.0, mad=0.0, n_observations=10)
+        baseline = UserBaseline(
+            user="a.amrani", metric="login_count", median=1.0, mad=0.0, n_observations=10
+        )
         z = baseline.robust_z_score(5.0)
         assert math.isfinite(z)
         assert z > 0
 
     def test_zero_mad_and_value_equal_to_median_returns_zero(self) -> None:
-        baseline = UserBaseline(user="a.amrani", metric="login_count", median=1.0, mad=0.0, n_observations=10)
+        baseline = UserBaseline(
+            user="a.amrani", metric="login_count", median=1.0, mad=0.0, n_observations=10
+        )
         assert baseline.robust_z_score(1.0) == 0.0
 
     def test_is_reliable_requires_minimum_observations(self) -> None:
@@ -56,7 +66,7 @@ class TestBaselineRepository:
         repo.fit({"a.amrani": {"login_count": [4.0, 5.0, 6.0, 5.0, 100.0]}})
         baseline = repo.get("a.amrani", "login_count")
 
-        # Une nouvelle valeur de 9 reste un écart significatif malgré l'outlier 100 dans l'historique
+        # Valeur 9 reste un écart significatif malgré l'outlier 100 dans l'historique
         assert baseline.robust_z_score(9.0) > 2.0
 
     def test_get_returns_neutral_baseline_for_unknown_user(self) -> None:

@@ -47,7 +47,9 @@ class TestRollingBaselineEngineInit:
         with pytest.raises(ValueError):
             RollingBaselineEngine(window_size=WINDOW_SIZE, window_step=WINDOW_STEP, lookback_days=0)
         with pytest.raises(ValueError):
-            RollingBaselineEngine(window_size=WINDOW_SIZE, window_step=WINDOW_STEP, lookback_days=-1)
+            RollingBaselineEngine(
+                window_size=WINDOW_SIZE, window_step=WINDOW_STEP, lookback_days=-1
+            )
 
 
 class TestRollingBaselineEngineExtract:
@@ -112,7 +114,6 @@ class TestRollingBaselineEngineExtract:
         vectors = engine.extract(lookback + scoring)
         scoring_day = [v for v in vectors if v.window_start.day == 13]
 
-        user_a_vec = next((v for v in scoring_day if v.user == "user_a"), None)
         user_b_vec = next((v for v in scoring_day if v.user == "user_b"), None)
 
         # user_a a un historique → z_login_count peut être non nul
@@ -120,7 +121,9 @@ class TestRollingBaselineEngineExtract:
         if user_b_vec is not None:
             assert user_b_vec.z_login_count == 0.0
 
-    def test_events_sorted_per_user_across_multiple_users(self, engine: RollingBaselineEngine) -> None:
+    def test_events_sorted_per_user_across_multiple_users(
+        self, engine: RollingBaselineEngine
+    ) -> None:
         events = [
             _event("4624", day=13, hour=9, minute=0, user="alice"),
             _event("4624", day=13, hour=9, minute=0, user="bob"),

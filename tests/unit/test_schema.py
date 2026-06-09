@@ -78,9 +78,7 @@ class TestMachineAccountFilter:
         assert filt.is_machine_account("   ") is True
 
     def test_custom_filter_rules_are_applied(self) -> None:
-        filt = MachineAccountFilter(
-            suffixes=["_svc"], exact_names=["guest"], prefixes=["test-"]
-        )
+        filt = MachineAccountFilter(suffixes=["_svc"], exact_names=["guest"], prefixes=["test-"])
         assert filt.is_machine_account("backup_svc") is True
         assert filt.is_machine_account("Guest") is True
         assert filt.is_machine_account("test-runner") is True

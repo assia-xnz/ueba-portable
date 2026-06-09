@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
+from typing import Any
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -101,7 +103,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_records(path: "Path") -> list[dict]:  # type: ignore[name-defined]
+def _load_records(path: Path) -> list[dict[str, Any]]:
     import csv
     import json
 
@@ -114,7 +116,7 @@ def _load_records(path: "Path") -> list[dict]:  # type: ignore[name-defined]
         return list(csv.DictReader(f))
 
 
-def _write_json(vectors: list, output_path: "Path") -> None:  # type: ignore[name-defined]
+def _write_json(vectors: list[Any], output_path: Path) -> None:
     import json
 
     rows = []
