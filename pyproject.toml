@@ -59,3 +59,8 @@ pythonpath = ["src"]
 [tool.coverage.run]
 branch = true
 source = ["src/ueba"]
+omit = [
+    "src/ueba/infrastructure/*",          # I/O, config, ES writer — require external services
+    "src/ueba/adapters/elasticsearch_api.py",  # requires live Elasticsearch
+    "src/ueba/cli.py",                    # entry-point — covered by integration
+]
