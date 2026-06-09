@@ -170,6 +170,65 @@ class UEBAFeatureExtractor:
         self._business_hour_end = business_hour_end
         self._baseline_repository = baseline_repository
 
+    @property
+    def baseline_repository(self) -> BaselineRepository | None:
+        """Référentiel de baselines actif, remplaçable par RollingBaselineEngine."""
+        return self._baseline_repository
+
+    @baseline_repository.setter
+    def baseline_repository(self, value: BaselineRepository | None) -> None:
+        self._baseline_repository = value
+
+    def extract_for_window(
+        self,
+        events: list[NormalizedEvent],
+        window_start: datetime,
+        window_end: datetime,
+        first_seen_hosts_by_user: dict[str, set[str]] | None = None,
+    ) -> list[FeatureVector]:
+        """Extrait les features pour exactement une fenêtre prédéfinie.
+
+        Contrairement à `extract()`, ne recalcule pas les bornes de fenêtre —
+        traite uniquement les événements dans [window_start, window_end). Utilisé
+        par `RollingBaselineEngine` pour associer chaque fenêtre à sa propre
+        baseline glissante.
+
+        Paramètres
+        ----------
+        events : list[NormalizedEvent]
+            Tous les événements disponibles (seuls ceux dans la fenêtre sont retenus).
+        window_start, window_end : datetime
+            Bornes de la fenêtre à traiter.
+        first_seen_hosts_by_user : dict[str, set[str]] | None, optionnel
+            État mutable partagé inter-fenêtres pour le calcul de `host_velocity`.
+            Modifié en place. Si `None`, chaque appel est indépendant.
+
+        Retours
+        -------
+        list[FeatureVector]
+            Un vecteur par utilisateur actif dans la fenêtre, ou liste vide.
+        """
+        window_events = [e for e in events if window_start <= e.timestamp < window_end]
+        if not window_events:
+            return []
+
+        by_user = self._group_by_user(window_events)
+        first_seen: dict[str, set[str]] = first_seen_hosts_by_user if first_seen_hosts_by_user is not None else {}
+
+        vectors: list[FeatureVector] = []
+        for user in sorted(by_user):
+            user_first_seen = first_seen.setdefault(user, set())
+            vectors.append(
+                self._build_feature_vector(
+                    user,
+                    window_start,
+                    window_end,
+                    sorted(by_user[user], key=lambda e: e.timestamp),
+                    user_first_seen,
+                )
+            )
+        return vectors
+
     def extract(self, events: list[NormalizedEvent]) -> list[FeatureVector]:
         """Construit les vecteurs de features pour chaque (utilisateur, fenêtre).
 
@@ -322,12 +381,16 @@ class UEBAFeatureExtractor:
     def _robust_z(self, user: str, metric: str, value: float) -> float:
         """Calcule le z-score robuste d'une valeur via le référentiel de baselines.
 
-        Retourne `0.0` lorsqu'aucun référentiel de baselines n'a été fourni
-        (par exemple lors d'une exécution sans historique suffisant).
+        Retourne `0.0` lorsqu'aucun référentiel n'est fourni ou que la baseline
+        de cet utilisateur est non fiable (trop peu d'observations) — comportement
+        prudent qui évite les fausses alertes sur historique insuffisant.
         """
         if self._baseline_repository is None:
             return 0.0
-        return self._baseline_repository.get(user, metric).robust_z_score(value)
+        baseline = self._baseline_repository.get(user, metric)
+        if not baseline.is_reliable:
+            return 0.0
+        return baseline.robust_z_score(value)
 
 
 __all__ = [
