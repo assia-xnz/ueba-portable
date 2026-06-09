@@ -25,8 +25,21 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 
 from ueba.domain.features import FeatureVector
+
+
+def _window_bucket(dt: datetime, step_minutes: int = 30) -> tuple[int, int, int, int, int]:
+    """Arrondit un horodatage au bas du bucket de `step_minutes` minutes.
+
+    Utilisé par `match_population` pour regrouper les vecteurs de plusieurs
+    utilisateurs dont les fenêtres glissantes démarrent à des secondes légèrement
+    différentes (car calculées à partir du premier événement de chaque utilisateur),
+    mais appartiennent conceptuellement à la même période temporelle.
+    """
+    bucketed_minute = (dt.minute // step_minutes) * step_minutes
+    return (dt.year, dt.month, dt.day, dt.hour, bucketed_minute)
 
 #: Seuils heuristiques au-delà desquels une feature est jugée « élevée ».
 #: Calibrés empiriquement sur l'export de validation (14 jours, 9 utilisateurs).
@@ -233,15 +246,19 @@ class MitreMapper:
             Une correspondance T1110.003 par fenêtre temporelle où le pattern
             collectif est observé (liste vide si aucun pattern détecté).
         """
-        by_window: dict[tuple, list[FeatureVector]] = defaultdict(list)
+        # Groupe par bucket de 30 min (pas exact) pour gérer les fenêtres par utilisateur
+        # dont les window_start diffèrent de quelques secondes selon le premier événement.
+        by_bucket: dict[tuple, list[FeatureVector]] = defaultdict(list)
         for vector in anomalous_vectors:
             if vector.failed_login_count >= PASSWORD_SPRAY_MIN_FAILED_LOGINS:
-                by_window[(vector.window_start, vector.window_end)].append(vector)
+                by_bucket[_window_bucket(vector.window_start)].append(vector)
 
         matches: list[MitreMatch] = []
-        for (window_start, window_end), vectors in sorted(by_window.items()):
+        for bucket_key, vectors in sorted(by_bucket.items()):
             distinct_users = {v.user for v in vectors}
             if len(distinct_users) >= PASSWORD_SPRAY_MIN_USERS:
+                window_start = min(v.window_start for v in vectors)
+                window_end = max(v.window_end for v in vectors)
                 matches.append(
                     MitreMatch(
                         technique_id="T1110.003",
