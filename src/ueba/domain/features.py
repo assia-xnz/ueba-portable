@@ -213,7 +213,9 @@ class UEBAFeatureExtractor:
             return []
 
         by_user = self._group_by_user(window_events)
-        first_seen: dict[str, set[str]] = first_seen_hosts_by_user if first_seen_hosts_by_user is not None else {}
+        first_seen: dict[str, set[str]] = (
+            first_seen_hosts_by_user if first_seen_hosts_by_user is not None else {}
+        )
 
         vectors: list[FeatureVector] = []
         for user in sorted(by_user):
@@ -279,9 +281,7 @@ class UEBAFeatureExtractor:
             )
         return vectors
 
-    def _iter_windows(
-        self, user_events: list[NormalizedEvent]
-    ) -> list[tuple[datetime, datetime]]:
+    def _iter_windows(self, user_events: list[NormalizedEvent]) -> list[tuple[datetime, datetime]]:
         """Génère les bornes des fenêtres glissantes couvrant la plage d'activité.
 
         La première fenêtre démarre à l'horodatage du premier événement de
@@ -317,7 +317,9 @@ class UEBAFeatureExtractor:
 
         hosts = {e.host for e in window_events if e.host}
         logon_types = {e.logon_type for e in window_events if e.logon_type}
-        processes = [e.process_name for e in window_events if e.is_process_creation and e.process_name]
+        processes = [
+            e.process_name for e in window_events if e.is_process_creation and e.process_name
+        ]
         process_entropy = _shannon_entropy(Counter(processes))
         unique_processes = len(set(processes))
         process_count = sum(1 for e in window_events if e.is_process_creation)

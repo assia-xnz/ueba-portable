@@ -24,8 +24,13 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "sample_logs.csv"
 PASSWORD_SPRAY_WINDOW_START_HOUR = 14
 PASSWORD_SPRAY_DATE = (2026, 5, 16)
 PASSWORD_SPRAY_USERS = {
-    "alice.martin", "bob.chen", "charlie.kim",
-    "diana.wolf", "eric.santos", "fiona.lee", "george.nasir",
+    "alice.martin",
+    "bob.chen",
+    "charlie.kim",
+    "diana.wolf",
+    "eric.santos",
+    "fiona.lee",
+    "george.nasir",
 }
 MIN_SPRAY_USERS = 3  # seuil PASSWORD_SPRAY_MIN_USERS dans mitre.py
 
@@ -80,9 +85,9 @@ class TestFixtureLoading:
 
     def test_both_event_types_are_present(self, normalized_events) -> None:
         event_ids = {e.event_id for e in normalized_events}
-        assert "4624" in event_ids   # logon
-        assert "4625" in event_ids   # failed logon
-        assert "4688" in event_ids   # process creation
+        assert "4624" in event_ids  # logon
+        assert "4625" in event_ids  # failed logon
+        assert "4688" in event_ids  # process creation
 
 
 class TestPasswordSprayScenario:
@@ -90,10 +95,9 @@ class TestPasswordSprayScenario:
 
     def test_failed_logins_are_present_in_spray_window(self, normalized_events) -> None:
         spray_events = [
-            e for e in normalized_events
-            if e.event_id == "4625"
-            and e.timestamp.day == 16
-            and e.timestamp.hour == 14
+            e
+            for e in normalized_events
+            if e.event_id == "4625" and e.timestamp.day == 16 and e.timestamp.hour == 14
         ]
         spray_users = {e.user for e in spray_events}
         assert len(spray_users) >= MIN_SPRAY_USERS, (
@@ -103,8 +107,7 @@ class TestPasswordSprayScenario:
 
     def test_failed_logins_originate_from_same_ip(self, normalized_events) -> None:
         spray_events = [
-            e for e in normalized_events
-            if e.event_id == "4625" and e.timestamp.day == 16
+            e for e in normalized_events if e.event_id == "4625" and e.timestamp.day == 16
         ]
         spray_ips = {e.src_ip for e in spray_events if e.src_ip}
         assert "10.10.0.50" in spray_ips
@@ -113,7 +116,8 @@ class TestPasswordSprayScenario:
         mapper = MitreMapper()
 
         spray_vectors = [
-            v for v in feature_vectors
+            v
+            for v in feature_vectors
             if v.window_start.day == 16
             and v.window_start.hour == PASSWORD_SPRAY_WINDOW_START_HOUR
             and v.failed_login_count > 0
@@ -127,42 +131,39 @@ class TestPasswordSprayScenario:
         technique_ids = [m.technique_id for m in mitre_matches]
 
         assert "T1110.003" in technique_ids, (
-            f"Password Spraying (T1110.003) non détecté. "
-            f"Matches obtenus : {technique_ids}"
+            f"Password Spraying (T1110.003) non détecté. " f"Matches obtenus : {technique_ids}"
         )
 
     def test_password_spray_match_identifies_targeted_users(self, feature_vectors) -> None:
         mapper = MitreMapper()
 
         spray_vectors = [
-            v for v in feature_vectors
+            v
+            for v in feature_vectors
             if v.window_start.day == 16
             and v.window_start.hour == PASSWORD_SPRAY_WINDOW_START_HOUR
             and v.failed_login_count > 0
         ]
         mitre_matches = mapper.match_population(spray_vectors)
-        spray_match = next(
-            (m for m in mitre_matches if m.technique_id == "T1110.003"), None
-        )
+        spray_match = next((m for m in mitre_matches if m.technique_id == "T1110.003"), None)
         assert spray_match is not None
 
         for user in ("alice.martin", "bob.chen", "charlie.kim"):
-            assert user in spray_match.rationale, (
-                f"Utilisateur {user!r} absent du rationale T1110.003 : {spray_match.rationale!r}"
-            )
+            assert (
+                user in spray_match.rationale
+            ), f"Utilisateur {user!r} absent du rationale T1110.003 : {spray_match.rationale!r}"
 
     def test_password_spray_source_is_heuristic(self, feature_vectors) -> None:
         mapper = MitreMapper()
         spray_vectors = [
-            v for v in feature_vectors
+            v
+            for v in feature_vectors
             if v.window_start.day == 16
             and v.window_start.hour == PASSWORD_SPRAY_WINDOW_START_HOUR
             and v.failed_login_count > 0
         ]
         mitre_matches = mapper.match_population(spray_vectors)
-        spray_match = next(
-            (m for m in mitre_matches if m.technique_id == "T1110.003"), None
-        )
+        spray_match = next((m for m in mitre_matches if m.technique_id == "T1110.003"), None)
         assert spray_match is not None
         assert spray_match.source == "heuristic"
 
@@ -172,8 +173,7 @@ class TestNormalActivityBaseline:
 
     def test_no_failed_logins_on_may_13(self, normalized_events) -> None:
         failed_may13 = [
-            e for e in normalized_events
-            if e.event_id == "4625" and e.timestamp.day == 13
+            e for e in normalized_events if e.event_id == "4625" and e.timestamp.day == 13
         ]
         assert len(failed_may13) == 0
 

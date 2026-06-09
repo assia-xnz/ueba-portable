@@ -104,9 +104,7 @@ class RollingBaselineEngine:
 
         return all_vectors
 
-    def _iter_windows(
-        self, events: list[NormalizedEvent]
-    ) -> list[tuple[datetime, datetime]]:
+    def _iter_windows(self, events: list[NormalizedEvent]) -> list[tuple[datetime, datetime]]:
         """Génère les bornes de toutes les fenêtres glissantes sur la plage d'activité."""
         first_ts = min(e.timestamp for e in events)
         last_ts = max(e.timestamp for e in events)
@@ -128,9 +126,7 @@ class RollingBaselineEngine:
         comportement prudent attendu (pas de fausse alerte sur données insuffisantes).
         """
         lookback_start = window_start - timedelta(days=self._lookback_days)
-        lookback_events = [
-            e for e in events if lookback_start <= e.timestamp < window_start
-        ]
+        lookback_events = [e for e in events if lookback_start <= e.timestamp < window_start]
 
         repo = BaselineRepository(min_observations=self._min_observations)
         if not lookback_events:
@@ -165,12 +161,8 @@ class RollingBaselineEngine:
                 by_user.setdefault(e.user, []).append(e)
 
             for user, user_evts in by_user.items():
-                user_obs = observations.setdefault(
-                    user, {m: [] for m in BASELINE_METRICS}
-                )
-                user_obs["login_count"].append(
-                    float(sum(1 for e in user_evts if e.is_login))
-                )
+                user_obs = observations.setdefault(user, {m: [] for m in BASELINE_METRICS})
+                user_obs["login_count"].append(float(sum(1 for e in user_evts if e.is_login)))
                 user_obs["process_count"].append(
                     float(sum(1 for e in user_evts if e.is_process_creation))
                 )

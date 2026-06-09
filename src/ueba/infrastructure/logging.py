@@ -43,7 +43,9 @@ def configure_logging(config_path: str | Path) -> None:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        raise LoggingConfigError(f"Fichier de configuration de logging YAML invalide : {exc}") from exc
+        raise LoggingConfigError(
+            f"Fichier de configuration de logging YAML invalide : {exc}"
+        ) from exc
 
     if not isinstance(raw, dict):
         raise LoggingConfigError("La configuration de logging doit décrire un mapping YAML")
