@@ -31,5 +31,13 @@ htmlcov/
 .vscode/
 .idea/
 
+# Modèles entraînés (générés, non versionnés)
+models/*
+!models/.gitkeep
+*.joblib
+
+# Variables d'environnement (credentials — NE JAMAIS COMMITTER)
+.env
+
 # OS
 .DS_Store
