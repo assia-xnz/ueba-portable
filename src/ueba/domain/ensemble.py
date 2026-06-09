@@ -214,5 +214,55 @@ class AnomalyEnsemble:
         result: npt.NDArray[np.bool_] = errors > self._reconstruction_error_threshold
         return result
 
+    def save(self, path: str) -> None:
+        """Persiste les modèles entraînés sur le disque (format joblib).
+
+        Paramètres
+        ----------
+        path : str
+            Chemin du fichier de sauvegarde (ex. "models/ensemble.joblib").
+        """
+        from pathlib import Path
+
+        import joblib  # type: ignore[import-untyped]
+
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "scaler": self._scaler,
+            "isolation_forest": self._isolation_forest,
+            "one_class_svm": self._one_class_svm,
+            "autoencoder": self._autoencoder,
+            "reconstruction_error_threshold": self._reconstruction_error_threshold,
+            "majority_threshold": self._majority_threshold,
+        }
+        joblib.dump(payload, out)
+
+    @classmethod
+    def load(cls, path: str) -> AnomalyEnsemble:
+        """Recharge un ensemble précédemment sauvegardé avec `save()`.
+
+        Paramètres
+        ----------
+        path : str
+            Chemin du fichier joblib.
+
+        Retours
+        -------
+        AnomalyEnsemble
+            Instance restaurée, prête à appeler `predict()`.
+        """
+        import joblib
+
+        payload = joblib.load(path)
+        instance = cls.__new__(cls)
+        instance._scaler = payload["scaler"]
+        instance._isolation_forest = payload["isolation_forest"]
+        instance._one_class_svm = payload["one_class_svm"]
+        instance._autoencoder = payload["autoencoder"]
+        instance._reconstruction_error_threshold = payload["reconstruction_error_threshold"]
+        instance._majority_threshold = payload["majority_threshold"]
+        return instance
+
 
 __all__ = ["ENSEMBLE_SIZE", "AnomalyEnsemble", "EnsembleVerdict"]
