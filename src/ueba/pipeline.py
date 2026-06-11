@@ -84,9 +84,6 @@ class UEBAPipeline:
         Profondeur de l'historique servant à la baseline glissante, par défaut 7.
     ensemble_mode : {"global", "per-user"}, optionnel
         Stratégie d'apprentissage, par défaut ``"per-user"`` (recommandée).
-    train_attack_dates : list[str] | None, optionnel
-        Dates ``YYYY-MM-DD`` à exclure de l'apprentissage (baseline propre).
-        Pris en charge uniquement en mode ``per-user``.
     min_windows_per_user : int, optionnel
         Seuil minimal de fenêtres par utilisateur en mode ``per-user``, par
         défaut 30.
@@ -106,7 +103,6 @@ class UEBAPipeline:
         window_step: timedelta,
         lookback_days: int = 7,
         ensemble_mode: EnsembleMode = "per-user",
-        train_attack_dates: list[str] | None = None,
         min_windows_per_user: int = 30,
         n_estimators: int = 200,
         majority_threshold: int = 2,
@@ -119,7 +115,6 @@ class UEBAPipeline:
         self._window_step = window_step
         self._lookback_days = lookback_days
         self._mode: EnsembleMode = ensemble_mode
-        self._train_attack_dates = list(train_attack_dates or [])
         self._min_windows_per_user = min_windows_per_user
         self._n_estimators = n_estimators
         self._majority_threshold = majority_threshold
@@ -168,7 +163,6 @@ class UEBAPipeline:
         else:
             per_user = PerUserAnomalyEnsemble(
                 min_windows_per_user=self._min_windows_per_user,
-                train_attack_dates=self._train_attack_dates or None,
                 n_estimators=self._n_estimators,
                 majority_threshold=self._majority_threshold,
                 random_state=self._random_state,
@@ -254,9 +248,9 @@ class UEBAPipeline:
     def run(self, events: list[NormalizedEvent]) -> list[AnomalyRecord]:
         """Exécute le flux complet : extraction → apprentissage → détection.
 
-        Apprend et score sur le même jeu d'événements (les jours d'attaque
-        sont, en mode per-user, exclus de l'apprentissage mais conservés au
-        scoring). C'est le mode d'emploi du notebook d'évaluation.
+        Apprend et score sur le même jeu d'événements fourni. La préparation
+        d'un jeu d'apprentissage propre (p. ex. retrait en amont des périodes
+        connues comme contaminées) relève de l'appelant.
 
         Paramètres
         ----------

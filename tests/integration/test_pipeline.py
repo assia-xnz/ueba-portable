@@ -166,12 +166,11 @@ class TestRunEndToEnd:
         assert all(isinstance(r, AnomalyRecord) for r in records)
         assert all(r.mode == "global" for r in records)
 
-    def test_run_per_user_with_attack_date_exclusion(self, fixture_events) -> None:  # type: ignore[no-untyped-def]
+    def test_run_per_user_on_fixture(self, fixture_events) -> None:  # type: ignore[no-untyped-def]
         pipeline = UEBAPipeline(
             window_size=_WINDOW,
             window_step=timedelta(minutes=30),
             ensemble_mode="per-user",
-            train_attack_dates=["2026-05-16"],
             min_windows_per_user=5,
             n_estimators=50,
         )

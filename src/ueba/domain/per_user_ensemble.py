@@ -14,12 +14,14 @@ exclusivement sur son historique comportemental.
 * **Groupement** des :class:`FeatureVector` par utilisateur ;
 * **Filtrage** des comptes machine/système et des utilisateurs au volume
   d'observation insuffisant pour apprendre une baseline fiable ;
-* **Exclusion optionnelle des jours d'attaque connus** de l'ensemble
-  d'apprentissage, afin que chaque modèle apprenne une baseline *propre*
-  (méthodologie standard d'évaluation supervisée d'un détecteur non
-  supervisé) ;
 * **Split chronologique** train/holdout par utilisateur, respectant la
   flèche du temps (jamais d'apprentissage sur le futur).
+
+La classe n'opère **aucune sélection sémantique** des données (ni exclusion
+de jours « contaminés », ni étiquetage) : conformément au principe de
+séparation des préoccupations, la préparation d'un jeu d'apprentissage propre
+incombe à l'appelant, en amont du pipeline. La classe se contente
+d'apprendre la normalité de ce qu'on lui fournit.
 
 À la prédiction, un utilisateur inconnu (jamais vu à l'apprentissage)
 déclenche une alerte par défaut (*default-deny*) : en contexte SOC, une
@@ -85,8 +87,7 @@ class PerUserAnomalyEnsemble:
     (`fit`, `predict`, `save`, `load`), mais opère au niveau du
     :class:`FeatureVector` (et non d'une matrice brute) car elle a besoin du
     champ `user` pour router chaque observation vers le bon modèle, et du
-    champ `window_start` pour le tri chronologique et l'exclusion des jours
-    d'attaque.
+    champ `window_start` pour le tri chronologique.
 
     Paramètres
     ----------
@@ -100,15 +101,10 @@ class PerUserAnomalyEnsemble:
         Si `True` (défaut), les comptes machine/système (`HOST$`, `SYSTEM`,
         `LOCAL SERVICE`, `NETWORK SERVICE`, `ANONYMOUS LOGON`, `DWM-*`,
         `UMFD-*`) sont exclus via :meth:`MachineAccountFilter.default`.
-    train_attack_dates : list[str] | None, optionnel
-        Liste de dates `YYYY-MM-DD` à retirer de l'ensemble d'apprentissage
-        de chaque utilisateur, pour apprendre une baseline propre exempte de
-        l'attaque connue. Si `None` (défaut), toutes les fenêtres sont
-        candidates à l'apprentissage.
     train_ratio : float, optionnel
-        Proportion chronologique des fenêtres (propres) servant à
-        l'apprentissage, par défaut 0.8. Le reliquat constitue un holdout
-        temporel non vu à l'apprentissage.
+        Proportion chronologique des fenêtres servant à l'apprentissage, par
+        défaut 0.8. Le reliquat (les 20 % les plus récents) constitue un
+        holdout temporel, non utilisé pour l'ajustement.
     n_estimators, svm_kernel, svm_gamma, autoencoder_hidden_layers, \
 reconstruction_error_percentile, majority_threshold, random_state
         Hyperparamètres transmis tels quels à chaque :class:`AnomalyEnsemble`
@@ -125,7 +121,6 @@ reconstruction_error_percentile, majority_threshold, random_state
         self,
         min_windows_per_user: int = 30,
         exclude_machine_accounts: bool = True,
-        train_attack_dates: list[str] | None = None,
         train_ratio: float = 0.8,
         n_estimators: int = 200,
         svm_kernel: str = "rbf",
@@ -142,7 +137,6 @@ reconstruction_error_percentile, majority_threshold, random_state
 
         self._min_windows_per_user = min_windows_per_user
         self._exclude_machine_accounts = exclude_machine_accounts
-        self._train_attack_dates: frozenset[str] = frozenset(train_attack_dates or ())
         self._train_ratio = train_ratio
         self._n_estimators = n_estimators
         self._svm_kernel = svm_kernel
@@ -196,10 +190,10 @@ reconstruction_error_percentile, majority_threshold, random_state
     def _training_subset(self, user_vectors: list[FeatureVector]) -> list[FeatureVector]:
         """Extrait le sous-ensemble d'apprentissage d'un utilisateur.
 
-        Les fenêtres sont d'abord triées chronologiquement, puis (si
-        `train_attack_dates` est fourni) débarrassées des jours d'attaque
-        connus, et enfin tronquées à la part `train_ratio` la plus ancienne
-        (split chronologique respectant la flèche du temps).
+        Les fenêtres sont triées chronologiquement, puis tronquées à la part
+        `train_ratio` la plus ancienne (split chronologique respectant la
+        flèche du temps). Les 20 % les plus récents forment un holdout non
+        utilisé pour l'ajustement.
 
         Paramètres
         ----------
@@ -209,16 +203,9 @@ reconstruction_error_percentile, majority_threshold, random_state
         Retours
         -------
         list[FeatureVector]
-            Les fenêtres retenues pour l'apprentissage (peut être vide si
-            toutes les fenêtres tombent un jour d'attaque).
+            Les fenêtres retenues pour l'apprentissage.
         """
         ordered = sorted(user_vectors, key=lambda v: v.window_start)
-        if self._train_attack_dates:
-            ordered = [
-                v
-                for v in ordered
-                if v.window_start.date().isoformat() not in self._train_attack_dates
-            ]
         split_index = int(len(ordered) * self._train_ratio)
         return ordered[:split_index]
 
@@ -229,14 +216,16 @@ reconstruction_error_percentile, majority_threshold, random_state
         ----------
         vectors : list[FeatureVector]
             Vecteurs de features de tous les utilisateurs et toutes les
-            fenêtres, dans un ordre arbitraire.
+            fenêtres, dans un ordre arbitraire. Il incombe à l'appelant de
+            fournir un jeu d'apprentissage propre (cf. docstring du module) :
+            la classe apprend la normalité de ce qu'on lui passe.
 
         Notes
         -----
         Un utilisateur valide (cf. :meth:`_is_valid_user`) dont le
-        sous-ensemble d'apprentissage est vide après exclusion des jours
-        d'attaque est silencieusement ignoré : aucun modèle ne lui est
-        associé et il sera traité en *default-deny* à la prédiction.
+        sous-ensemble d'apprentissage est vide est silencieusement ignoré :
+        aucun modèle ne lui est associé et il sera traité en *default-deny* à
+        la prédiction.
         """
         grouped: dict[str, list[FeatureVector]] = {}
         for vector in vectors:
@@ -329,7 +318,6 @@ reconstruction_error_percentile, majority_threshold, random_state
         return {
             "min_windows_per_user": self._min_windows_per_user,
             "exclude_machine_accounts": self._exclude_machine_accounts,
-            "train_attack_dates": sorted(self._train_attack_dates),
             "train_ratio": self._train_ratio,
             "n_estimators": self._n_estimators,
             "svm_kernel": self._svm_kernel,

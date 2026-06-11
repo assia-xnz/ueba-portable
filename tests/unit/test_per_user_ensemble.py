@@ -163,57 +163,14 @@ class TestFiltering:
 
         assert ensemble.trained_users == ["alice"]
 
+    def test_fit_skips_user_with_empty_training_subset(self) -> None:
+        # Un seul vecteur valide → int(1 × 0.8) = 0 → sous-ensemble train vide → ignoré.
+        vectors = _make_user_windows("solo", 1, seed=0)
+        ensemble = PerUserAnomalyEnsemble(min_windows_per_user=1, train_ratio=0.8, n_estimators=50)
+        ensemble.fit(vectors)
 
-class TestAttackDateExclusion:
-    """Exclusion des jours d'attaque connus de l'ensemble d'apprentissage."""
-
-    def test_fit_with_train_attack_dates_excludes_those_days(self) -> None:
-        attack_day = datetime(2026, 5, 13, 8, 0, 0)
-        clean_user = _make_user_windows("alice", 10, start=_ORIGIN, seed=0)
-        # Toutes les fenêtres de "spray" tombent le jour d'attaque.
-        attack_only_user = _make_user_windows("spray", 8, start=attack_day, seed=400)
-        vectors = clean_user + attack_only_user
-
-        without_exclusion = PerUserAnomalyEnsemble(min_windows_per_user=5, n_estimators=50)
-        without_exclusion.fit(vectors)
-
-        with_exclusion = PerUserAnomalyEnsemble(
-            min_windows_per_user=5,
-            train_attack_dates=["2026-05-13"],
-            n_estimators=50,
-        )
-        with_exclusion.fit(vectors)
-
-        # Sans exclusion : "spray" a un historique → modèle entraîné.
-        assert "spray" in without_exclusion.trained_users
-        # Avec exclusion : toutes ses fenêtres sont retirées → aucun modèle.
-        assert "spray" not in with_exclusion.trained_users
-        # L'utilisateur propre reste entraîné dans les deux cas.
-        assert "alice" in with_exclusion.trained_users
-
-    def test_clean_baseline_detects_attack_window(self) -> None:
-        """Une baseline propre flague la fenêtre d'attaque extrême exclue du train."""
-        attack_day_str = "2026-05-13"
-        clean = _make_user_windows("victim", 12, start=_ORIGIN, base=5.0, seed=0)
-        attack_window = _make_vector(
-            "victim",
-            datetime(2026, 5, 13, 10, 0, 0),
-            base=5.0,
-            seed=0,
-            failed_login_count=500.0,
-            failed_login_ratio=0.99,
-            login_velocity=80.0,
-        )
-        ensemble = PerUserAnomalyEnsemble(
-            min_windows_per_user=5,
-            train_attack_dates=[attack_day_str],
-            n_estimators=80,
-        )
-        ensemble.fit(clean + [attack_window])
-
-        (verdict,) = ensemble.predict([attack_window])
-        assert verdict.was_in_training is True
-        assert verdict.is_anomaly is True
+        assert ensemble.is_fitted is True
+        assert "solo" not in ensemble.trained_users
 
 
 class TestChronologicalOrdering:

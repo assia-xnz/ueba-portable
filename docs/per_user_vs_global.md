@@ -45,14 +45,21 @@ utilisateur**, exclusivement sur l'historique de cet utilisateur :
 1. **Groupement** des vecteurs de features par `user` ;
 2. **Filtrage** des comptes machine/système (`MachineAccountFilter`) et des
    utilisateurs au volume insuffisant (`min_windows_per_user`) ;
-3. **Exclusion** optionnelle des jours d'attaque connus de l'apprentissage
-   (`train_attack_dates`), pour apprendre une baseline *propre* ;
-4. **Split chronologique** train/holdout respectant la flèche du temps ;
-5. **Default-deny** : un utilisateur jamais vu à l'apprentissage est traité
+3. **Split chronologique** train/holdout respectant la flèche du temps ;
+4. **Default-deny** : un utilisateur jamais vu à l'apprentissage est traité
    comme anomalie par prudence (posture SOC standard).
 
 Chaque modèle ne connaît que *sa* normalité ; le biais de population
 disparaît par construction.
+
+> **Séparation des préoccupations.** La classe `PerUserAnomalyEnsemble`
+> apprend la normalité de ce qu'on lui fournit ; elle n'opère **aucune
+> sélection sémantique** des données (pas d'étiquetage, pas d'exclusion de
+> jours « contaminés »). La préparation d'un jeu d'apprentissage propre —
+> retrait en amont des périodes connues comme compromises — relève de
+> l'appelant (script, notebook, ou pipeline d'ingestion), pas du modèle. Cela
+> garde la classe simple, testable et réutilisable hors de tout scénario
+> d'attaque particulier.
 
 ---
 

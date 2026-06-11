@@ -80,7 +80,7 @@ def _add_window_args(p: argparse.ArgumentParser) -> None:
 
 
 def _add_mode_args(p: argparse.ArgumentParser) -> None:
-    """Ajoute les arguments de mode d'apprentissage et d'exclusion de jours d'attaque."""
+    """Ajoute l'argument de mode d'apprentissage."""
     p.add_argument(
         "--mode",
         choices=["per-user", "global"],
@@ -89,15 +89,6 @@ def _add_mode_args(p: argparse.ArgumentParser) -> None:
             "Mode d'apprentissage. 'per-user' (défaut, recommandé) : un modèle "
             "dédié par utilisateur, véritable UEBA personnalisée. 'global' : un "
             "unique modèle pour toute la population (baseline collective biaisée)."
-        ),
-    )
-    p.add_argument(
-        "--train-attack-dates",
-        default=None,
-        help=(
-            "Dates d'attaque connues à exclure de l'apprentissage (baseline "
-            "propre), au format YYYY-MM-DD séparées par des virgules "
-            "(ex. 2026-05-13,2026-05-16). Mode per-user uniquement."
         ),
     )
 
@@ -236,17 +227,11 @@ def _build_pipeline(args: argparse.Namespace) -> UEBAPipeline:
     """Instancie un pipeline à partir des arguments de la ligne de commande."""
     from ueba.pipeline import UEBAPipeline
 
-    attack_dates: list[str] | None = None
-    raw_dates = getattr(args, "train_attack_dates", None)
-    if raw_dates:
-        attack_dates = [d.strip() for d in raw_dates.split(",") if d.strip()]
-
     return UEBAPipeline(
         window_size=timedelta(hours=args.window_hours),
         window_step=timedelta(minutes=args.step_minutes),
         lookback_days=args.lookback_days,
         ensemble_mode=args.mode,
-        train_attack_dates=attack_dates,
     )
 
 

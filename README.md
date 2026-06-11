@@ -148,7 +148,6 @@ poetry run ueba run data/raw/export.csv --source wazuh --output anomalies.json
 | `--step-minutes` | `30` | Pas de glissement (minutes) |
 | `--lookback-days` | `7` | Fenêtre de lookback pour la baseline |
 | `--mode` | `per-user` | Stratégie d'apprentissage : `per-user` ou `global` |
-| `--train-attack-dates` | — | Jours `YYYY-MM-DD` (séparés par virgules) exclus de l'apprentissage (baseline propre) |
 
 ### Exemple de sortie JSON
 
@@ -291,9 +290,8 @@ par rapport à *sa* normalité, pas à celle des autres. Un utilisateur jamais
 vu à l'apprentissage déclenche une alerte par défaut (*default-deny*).
 
 ```bash
-# Apprentissage + détection en une passe, baseline propre (jours d'attaque exclus du train)
-poetry run ueba run data/raw/export.csv --mode per-user \
-    --train-attack-dates 2026-05-13,2026-05-16 --output anomalies.json
+# Apprentissage + détection en une passe (fournir un export déjà nettoyé en amont)
+poetry run ueba run data/raw/export.csv --mode per-user --output anomalies.json
 
 # Apprentissage seul, puis sauvegarde du modèle
 poetry run ueba train --input data/raw/export.csv --mode per-user \
