@@ -20,13 +20,14 @@
 5. [Mapping des champs SIEM](#5-mapping-des-champs-siem)
 6. [Les 16 features comportementales](#6-les-16-features-comportementales)
 7. [Réduction des faux positifs — 3 leviers](#7-réduction-des-faux-positifs--3-leviers)
-8. [Validation : détection du Password Spray (T1110.003)](#8-validation--détection-du-password-spray-t1110003)
-9. [Mapping MITRE ATT&CK](#9-mapping-mitre-attck)
-10. [Ajouter un nouveau SIEM](#10-ajouter-un-nouveau-siem)
-11. [Configuration `.env`](#11-configuration-env)
-12. [Structure du projet](#12-structure-du-projet)
-13. [Contribuer](#13-contribuer)
-14. [Licence](#14-licence)
+8. [Modes d'apprentissage](#8-modes-dapprentissage)
+9. [Validation : détection du Password Spray (T1110.003)](#9-validation--détection-du-password-spray-t1110003)
+10. [Mapping MITRE ATT&CK](#10-mapping-mitre-attck)
+11. [Ajouter un nouveau SIEM](#11-ajouter-un-nouveau-siem)
+12. [Configuration `.env`](#12-configuration-env)
+13. [Structure du projet](#13-structure-du-projet)
+14. [Contribuer](#14-contribuer)
+15. [Licence](#15-licence)
 
 ---
 
@@ -123,7 +124,7 @@ poetry install
 ### Vérification
 
 ```bash
-poetry run pytest            # 145 tests, couverture > 80 %
+poetry run pytest            # 174 tests, couverture > 80 %
 poetry run ueba version
 ```
 
@@ -146,16 +147,22 @@ poetry run ueba run data/raw/export.csv --source wazuh --output anomalies.json
 | `--window-hours` | `1.0` | Taille de la fenêtre glissante (heures) |
 | `--step-minutes` | `30` | Pas de glissement (minutes) |
 | `--lookback-days` | `7` | Fenêtre de lookback pour la baseline |
+| `--mode` | `per-user` | Stratégie d'apprentissage : `per-user` ou `global` |
+| `--train-attack-dates` | — | Jours `YYYY-MM-DD` (séparés par virgules) exclus de l'apprentissage (baseline propre) |
 
 ### Exemple de sortie JSON
 
 ```json
 [
   {
-    "user": "alice.martin",
+    "user": "k.alaa",
     "window_start": "2026-05-16T14:02:10",
     "window_end": "2026-05-16T15:02:10",
-    "features": [4.0, 4.0, 0.5, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.067, 0.0, 0.0, 0.0]
+    "is_anomaly": true,
+    "mode": "per-user",
+    "used_model": "k.alaa",
+    "vote_count": 3,
+    "votes": {"isolation_forest": true, "one_class_svm": true, "autoencoder": true}
   }
 ]
 ```
@@ -264,7 +271,56 @@ qui polluerait les baselines et produirait des alertes massives sans valeur opé
 
 ---
 
-## 8. Validation : détection du Password Spray (T1110.003)
+## 8. Modes d'apprentissage
+
+Deux stratégies de modélisation, sélectionnables via `--mode` (CLI) ou
+`ensemble_mode` (pipeline). Le défaut est **per-user**.
+
+### Mode global (`AnomalyEnsemble`)
+
+Un **unique** modèle appris sur la population entière. Simple, mais sa
+baseline collective est dominée par les comptes les plus actifs : les autres
+entités paraissent anormales par défaut (biais de population).
+
+### Mode per-user (`PerUserAnomalyEnsemble`) — recommandé
+
+Un modèle **dédié par utilisateur**, entraîné uniquement sur son propre
+historique. C'est la véritable UEBA personnalisée, conforme à la littérature
+(Salem & Stolfo 2011 ; Veeramachaneni et al. 2016) : chaque entité est jugée
+par rapport à *sa* normalité, pas à celle des autres. Un utilisateur jamais
+vu à l'apprentissage déclenche une alerte par défaut (*default-deny*).
+
+```bash
+# Apprentissage + détection en une passe, baseline propre (jours d'attaque exclus du train)
+poetry run ueba run data/raw/export.csv --mode per-user \
+    --train-attack-dates 2026-05-13,2026-05-16 --output anomalies.json
+
+# Apprentissage seul, puis sauvegarde du modèle
+poetry run ueba train --input data/raw/export.csv --mode per-user \
+    --save-model models/per_user.joblib
+
+# Détection à partir d'un modèle sauvegardé
+poetry run ueba detect --input data/raw/new.csv \
+    --load-model models/per_user.joblib --output anomalies.json
+```
+
+### Résultats comparés (dataset Wazuh réel, 14 jours, T1110.003)
+
+| Métrique                  | Global  | Per-user |
+|---------------------------|---------|----------|
+| Recall fenêtre            |  29.4%  |  56.7%   |
+| Recall opérationnel       |   N/A   | 100.0%   |
+| Détection en 1ʳᵉ fenêtre  |   N/A   |  14/14   |
+| FP rate (jours propres)   |   2.8%\* |  31.6%   |
+
+> \* En mode global, les faux positifs se concentrent sur `soc-admin` ; ce taux
+> masque un biais de population (taux d'anomalies global de 44 %, `k.alaa`
+> flaguée à 100 % des fenêtres). Analyse détaillée :
+> [`docs/per_user_vs_global.md`](docs/per_user_vs_global.md).
+
+---
+
+## 9. Validation : détection du Password Spray (T1110.003)
 
 La fixture de test `tests/integration/fixtures/sample_logs.csv` inclut un scénario de
 **password spraying** synthétique : 7 comptes cibles, 2 à 4 échecs de connexion chacun,
@@ -301,7 +357,7 @@ poetry run pytest tests/integration/ -v
 
 ---
 
-## 9. Mapping MITRE ATT&CK
+## 10. Mapping MITRE ATT&CK
 
 ### Heuristiques individuelles (par utilisateur × fenêtre)
 
@@ -327,7 +383,7 @@ ce signal est ajouté en tête de liste, avant les heuristiques internes.
 
 ---
 
-## 10. Ajouter un nouveau SIEM
+## 11. Ajouter un nouveau SIEM
 
 1. **Créer l'adapter** dans `src/ueba/adapters/mon_siem.py` :
 
@@ -363,7 +419,7 @@ Le cœur ML (`features.py`, `ensemble.py`, `mitre.py`) ne change pas.
 
 ---
 
-## 11. Configuration `.env`
+## 12. Configuration `.env`
 
 Créer un fichier `.env` à la racine (non versionné — voir `.gitignore`) :
 
@@ -388,7 +444,7 @@ Les valeurs sont lues par `src/ueba/infrastructure/config.py` via `python-dotenv
 
 ---
 
-## 12. Structure du projet
+## 13. Structure du projet
 
 ```
 ueba-portable/
@@ -405,18 +461,20 @@ ueba-portable/
 │   │   ├── baseline.py    # UserBaseline, BaselineRepository, z-score robuste
 │   │   ├── features.py    # UEBAFeatureExtractor (16 features, fenêtres glissantes)
 │   │   ├── ensemble.py    # AnomalyEnsemble (IF + OCSVM + Autoencoder MLP)
+│   │   ├── per_user_ensemble.py  # PerUserAnomalyEnsemble (un modèle par utilisateur)
 │   │   └── mitre.py       # MitreMapper (heuristiques + signal SIEM + population)
 │   ├── scoring/
 │   │   └── rolling_baseline.py  # RollingBaselineEngine (baseline glissante N-day)
 │   ├── infrastructure/    # I/O, config YAML/.env, logging structuré
-│   ├── cli.py             # Entrée CLI `ueba run` / `ueba version`
-│   └── pipeline.py        # Orchestration bout-en-bout
+│   ├── cli.py             # Entrée CLI `ueba run` / `train` / `detect` / `version`
+│   └── pipeline.py        # UEBAPipeline (orchestration extract → fit → predict, global/per-user)
 ├── tests/
-│   ├── unit/              # Tests unitaires (145 au total, couverture > 80 %)
+│   ├── unit/              # Tests unitaires (161 au total, couverture > 80 %)
 │   └── integration/
 │       ├── fixtures/
 │       │   └── sample_logs.csv   # 103 événements synthétiques, 7 utilisateurs
-│       └── test_password_spray_detection.py
+│       ├── test_password_spray_detection.py
+│       └── test_pipeline.py      # Pipeline bout-en-bout (global + per-user)
 ├── notebooks/             # Exploration, analyse des features, visualisation
 ├── scripts/               # run_pipeline.py, generate_attack_scenarios.py
 ├── docs/                  # Architecture, data flow, couverture MITRE
@@ -427,7 +485,7 @@ ueba-portable/
 
 ---
 
-## 13. Contribuer
+## 14. Contribuer
 
 ```bash
 # Installer les dépendances de développement
@@ -448,7 +506,7 @@ Les pull requests doivent maintenir la couverture de tests > 80 % et passer tous
 
 ---
 
-## 14. Licence
+## 15. Licence
 
 Ce projet est distribué sous licence **MIT**. Voir le fichier [`LICENSE`](LICENSE).
 
