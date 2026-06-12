@@ -105,6 +105,11 @@ class PerUserAnomalyEnsemble:
         Proportion chronologique des fenêtres servant à l'apprentissage, par
         défaut 0.8. Le reliquat (les 20 % les plus récents) constitue un
         holdout temporel, non utilisé pour l'ajustement.
+    svm_nu : float, optionnel
+        Borne supérieure de la fraction d'outliers tolérée par le OneClassSVM,
+        par défaut **0.05** (et non 0.5 comme :class:`AnomalyEnsemble`) : une
+        baseline per-user est censée être *propre*, on n'y attend donc que très
+        peu d'anomalies. Abaisse fortement le taux de faux positifs.
     n_estimators, svm_kernel, svm_gamma, autoencoder_hidden_layers, \
 reconstruction_error_percentile, majority_threshold, random_state
         Hyperparamètres transmis tels quels à chaque :class:`AnomalyEnsemble`
@@ -125,6 +130,7 @@ reconstruction_error_percentile, majority_threshold, random_state
         n_estimators: int = 200,
         svm_kernel: str = "rbf",
         svm_gamma: str = "scale",
+        svm_nu: float = 0.05,
         autoencoder_hidden_layers: tuple[int, ...] = (8, 4, 8),
         reconstruction_error_percentile: float = 95.0,
         majority_threshold: int = 2,
@@ -141,6 +147,7 @@ reconstruction_error_percentile, majority_threshold, random_state
         self._n_estimators = n_estimators
         self._svm_kernel = svm_kernel
         self._svm_gamma = svm_gamma
+        self._svm_nu = svm_nu
         self._autoencoder_hidden_layers = autoencoder_hidden_layers
         self._reconstruction_error_percentile = reconstruction_error_percentile
         self._majority_threshold = majority_threshold
@@ -307,6 +314,7 @@ reconstruction_error_percentile, majority_threshold, random_state
             n_estimators=self._n_estimators,
             svm_kernel=self._svm_kernel,
             svm_gamma=self._svm_gamma,
+            svm_nu=self._svm_nu,
             autoencoder_hidden_layers=self._autoencoder_hidden_layers,
             reconstruction_error_percentile=self._reconstruction_error_percentile,
             majority_threshold=self._majority_threshold,
@@ -322,6 +330,7 @@ reconstruction_error_percentile, majority_threshold, random_state
             "n_estimators": self._n_estimators,
             "svm_kernel": self._svm_kernel,
             "svm_gamma": self._svm_gamma,
+            "svm_nu": self._svm_nu,
             "autoencoder_hidden_layers": self._autoencoder_hidden_layers,
             "reconstruction_error_percentile": self._reconstruction_error_percentile,
             "majority_threshold": self._majority_threshold,

@@ -92,6 +92,9 @@ class UEBAPipeline:
         mode ``per-user``, par défaut 0.8. Mettre ``1.0`` pour apprendre sur
         l'**intégralité** d'un jeu de données propre dédié (cas d'usage SOC :
         constitution d'une baseline « normale »).
+    svm_nu : float, optionnel
+        Fraction d'outliers tolérée par le OneClassSVM, par défaut 0.05 (adapté
+        à une baseline propre — réduit fortement les faux positifs).
     n_estimators, majority_threshold, random_state
         Hyperparamètres transmis à l'ensemble (mêmes valeurs par défaut que
         :class:`AnomalyEnsemble`).
@@ -110,6 +113,7 @@ class UEBAPipeline:
         ensemble_mode: EnsembleMode = "per-user",
         min_windows_per_user: int = 30,
         train_ratio: float = 0.8,
+        svm_nu: float = 0.05,
         n_estimators: int = 200,
         majority_threshold: int = 2,
         random_state: int = 42,
@@ -123,6 +127,7 @@ class UEBAPipeline:
         self._mode: EnsembleMode = ensemble_mode
         self._min_windows_per_user = min_windows_per_user
         self._train_ratio = train_ratio
+        self._svm_nu = svm_nu
         self._n_estimators = n_estimators
         self._majority_threshold = majority_threshold
         self._random_state = random_state
@@ -162,6 +167,7 @@ class UEBAPipeline:
         if self._mode == "global":
             ensemble = AnomalyEnsemble(
                 n_estimators=self._n_estimators,
+                svm_nu=self._svm_nu,
                 majority_threshold=self._majority_threshold,
                 random_state=self._random_state,
             )
@@ -171,6 +177,7 @@ class UEBAPipeline:
             per_user = PerUserAnomalyEnsemble(
                 min_windows_per_user=self._min_windows_per_user,
                 train_ratio=self._train_ratio,
+                svm_nu=self._svm_nu,
                 n_estimators=self._n_estimators,
                 majority_threshold=self._majority_threshold,
                 random_state=self._random_state,

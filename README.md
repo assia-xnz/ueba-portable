@@ -309,6 +309,11 @@ poetry run ueba detect --input live.csv \
 > La commande `train` utilise par défaut `--train-ratio 1.0` : elle apprend
 > sur **l'intégralité** du jeu propre fourni. La préparation d'un dataset sans
 > incident relève de l'utilisateur (séparation des préoccupations).
+>
+> Le OneClassSVM est réglé par défaut sur `--svm-nu 0.05` (mode per-user) :
+> sur une baseline propre on ne tolère que peu d'outliers, ce qui réduit
+> fortement les faux positifs. Abaisse encore cette valeur si ton taux
+> d'anomalies sur le normal reste trop élevé.
 
 Pour une évaluation rapide (apprentissage **et** scoring sur le même export,
 avec holdout 80/20) :

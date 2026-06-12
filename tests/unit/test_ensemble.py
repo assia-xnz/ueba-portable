@@ -126,3 +126,27 @@ class TestAnomalyEnsembleDetection:
         verdicts_a = [v.is_anomaly for v in ensemble_a.predict(sample)]
         verdicts_b = [v.is_anomaly for v in ensemble_b.predict(sample)]
         assert verdicts_a == verdicts_b
+
+
+class TestSvmNu:
+    """Vérifie l'effet du paramètre svm_nu sur les faux positifs."""
+
+    def test_lower_nu_reduces_false_positives_on_normal(self) -> None:
+        population = _make_normal_population(n=300, seed=0)
+
+        loose = AnomalyEnsemble(n_estimators=100, svm_nu=0.5, random_state=42)
+        loose.fit(population)
+        strict = AnomalyEnsemble(n_estimators=100, svm_nu=0.05, random_state=42)
+        strict.fit(population)
+
+        loose_fp = sum(1 for v in loose.predict(population) if v.is_anomaly)
+        strict_fp = sum(1 for v in strict.predict(population) if v.is_anomaly)
+
+        # Un nu plus bas resserre la frontière « normale » → moins de faux positifs.
+        assert strict_fp < loose_fp
+
+    def test_invalid_nu_is_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            AnomalyEnsemble(svm_nu=0.0)
+        with pytest.raises(ValueError):
+            AnomalyEnsemble(svm_nu=1.5)

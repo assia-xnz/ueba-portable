@@ -83,6 +83,12 @@ class AnomalyEnsemble:
         Noyau du OneClassSVM, par défaut "rbf".
     svm_gamma : str, optionnel
         Coefficient gamma du noyau RBF, par défaut "scale".
+    svm_nu : float, optionnel
+        Borne supérieure de la fraction d'erreurs d'apprentissage tolérée par
+        le OneClassSVM (et borne inférieure de la fraction de vecteurs de
+        support), dans l'intervalle ]0, 1], par défaut 0.5. Sur une baseline
+        *propre* (UEBA), une valeur basse (~0.05) est appropriée : on n'attend
+        que peu d'outliers dans des données déjà filtrées de tout incident.
     autoencoder_hidden_layers : tuple[int, ...], optionnel
         Tailles des couches cachées du MLPRegressor formant l'autoencodeur,
         par défaut (8, 4, 8) — un goulot d'étranglement à 4 neurones pour
@@ -103,6 +109,7 @@ class AnomalyEnsemble:
         n_estimators: int = 200,
         svm_kernel: str = "rbf",
         svm_gamma: str = "scale",
+        svm_nu: float = 0.5,
         autoencoder_hidden_layers: tuple[int, ...] = (8, 4, 8),
         reconstruction_error_percentile: float = 95.0,
         majority_threshold: int = 2,
@@ -110,6 +117,8 @@ class AnomalyEnsemble:
     ) -> None:
         if not 1 <= majority_threshold <= ENSEMBLE_SIZE:
             raise ValueError(f"majority_threshold doit être compris entre 1 et {ENSEMBLE_SIZE}")
+        if not 0.0 < svm_nu <= 1.0:
+            raise ValueError("svm_nu doit être compris dans l'intervalle ]0, 1]")
 
         self._majority_threshold = majority_threshold
         self._reconstruction_error_percentile = reconstruction_error_percentile
@@ -118,7 +127,7 @@ class AnomalyEnsemble:
         self._isolation_forest = IsolationForest(
             n_estimators=n_estimators, random_state=random_state
         )
-        self._one_class_svm = OneClassSVM(kernel=svm_kernel, gamma=svm_gamma)
+        self._one_class_svm = OneClassSVM(kernel=svm_kernel, gamma=svm_gamma, nu=svm_nu)
         self._autoencoder = MLPRegressor(
             hidden_layer_sizes=autoencoder_hidden_layers,
             random_state=random_state,

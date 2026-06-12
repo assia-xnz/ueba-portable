@@ -101,6 +101,15 @@ def _add_mode_args(p: argparse.ArgumentParser) -> None:
             "traitée en default-deny. À calibrer selon la longueur de la baseline."
         ),
     )
+    p.add_argument(
+        "--svm-nu",
+        type=float,
+        default=0.05,
+        help=(
+            "Fraction d'outliers tolérée par le OneClassSVM (défaut : 0.05, "
+            "adapté à une baseline propre). Plus bas = moins de faux positifs."
+        ),
+    )
 
 
 def _add_run_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -263,6 +272,7 @@ def _build_pipeline(args: argparse.Namespace) -> UEBAPipeline:
         ensemble_mode=args.mode,
         min_windows_per_user=getattr(args, "min_windows_per_user", 30),
         train_ratio=getattr(args, "train_ratio", 0.8),
+        svm_nu=getattr(args, "svm_nu", 0.05),
     )
 
 
