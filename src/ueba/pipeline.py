@@ -315,29 +315,56 @@ class UEBAPipeline:
 
     @classmethod
     def load_model(cls, path: str) -> UEBAPipeline:
-        """Recharge un pipeline entraîné depuis un fichier produit par :meth:`save_model`.
+        """Recharge un pipeline entraîné depuis un fichier joblib.
 
-        La configuration de fenêtrage sauvegardée est restaurée, afin que
-        :meth:`extract` traite les nouveaux événements de façon cohérente avec
-        l'apprentissage.
+        Rétrocompatible : accepte aussi bien un modèle produit par
+        :meth:`save_model` (format pipeline natif) qu'un
+        :class:`PerUserAnomalyEnsemble` sérialisé directement (p. ex. depuis le
+        notebook d'entraînement Colab). Les clés de configuration de fenêtrage
+        absentes retombent sur des valeurs par défaut (fenêtre 1 h, pas 30 min,
+        lookback 7 j), cohérentes avec l'extraction de features.
 
         Retours
         -------
         UEBAPipeline
             Pipeline restauré, prêt à appeler :meth:`extract` puis :meth:`predict`.
+
+        Lève
+        ----
+        ValueError
+            Si le contenu du fichier n'est ni un pipeline ni un
+            PerUserAnomalyEnsemble reconnaissable.
         """
         import joblib
 
         payload = joblib.load(path)
-        config = payload["config"]
-        pipeline = cls(
-            window_size=timedelta(seconds=config["window_seconds"]),
-            window_step=timedelta(seconds=config["step_seconds"]),
-            lookback_days=config["lookback_days"],
-            ensemble_mode=payload["mode"],
+
+        # Cas 1 — format pipeline natif (UEBAPipeline.save_model).
+        if isinstance(payload, dict) and "ensemble" in payload:
+            config = payload.get("config", {})
+            pipeline = cls(
+                window_size=timedelta(seconds=float(config.get("window_seconds", 3600.0))),
+                window_step=timedelta(seconds=float(config.get("step_seconds", 1800.0))),
+                lookback_days=int(config.get("lookback_days", 7)),
+                ensemble_mode=payload.get("mode", "per-user"),
+            )
+            pipeline._ensemble = payload["ensemble"]
+            return pipeline
+
+        # Cas 2 — PerUserAnomalyEnsemble sérialisé directement (notebook Colab).
+        if isinstance(payload, dict) and "models" in payload and "trained_users" in payload:
+            pipeline = cls(
+                window_size=timedelta(hours=1),
+                window_step=timedelta(minutes=30),
+                lookback_days=7,
+                ensemble_mode="per-user",
+            )
+            pipeline._ensemble = PerUserAnomalyEnsemble.load(path)
+            return pipeline
+
+        raise ValueError(
+            "Format de modèle non reconnu : ni pipeline UEBA, ni PerUserAnomalyEnsemble"
         )
-        pipeline._ensemble = payload["ensemble"]
-        return pipeline
 
 
 __all__ = [

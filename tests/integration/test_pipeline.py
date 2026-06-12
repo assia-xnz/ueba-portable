@@ -248,3 +248,23 @@ class TestModelPersistence:
 
         assert restored.mode == "global"
         assert [r.is_anomaly for r in before] == [r.is_anomaly for r in after]
+
+    def test_load_model_accepts_per_user_ensemble_payload(
+        self, training_vectors: list[FeatureVector], tmp_path
+    ) -> None:  # type: ignore[no-untyped-def]
+        # Un modèle sauvegardé directement par PerUserAnomalyEnsemble (cas du
+        # notebook Colab) doit être chargeable par le pipeline (rétrocompat).
+        from ueba.domain.per_user_ensemble import PerUserAnomalyEnsemble
+
+        ensemble = PerUserAnomalyEnsemble(min_windows_per_user=10, n_estimators=50)
+        ensemble.fit(training_vectors)
+
+        path = tmp_path / "notebook_model.joblib"
+        ensemble.save(str(path))
+
+        pipeline = UEBAPipeline.load_model(str(path))
+        records = pipeline.predict(training_vectors)
+
+        assert pipeline.mode == "per-user"
+        assert len(records) == len(training_vectors)
+        assert {r.used_model for r in records} == {"alice", "bob"}
