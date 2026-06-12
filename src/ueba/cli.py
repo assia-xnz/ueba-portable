@@ -170,6 +170,15 @@ def _add_detect_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser])
         default="wazuh",
         help="Format source du SIEM (défaut : wazuh)",
     )
+    detect_p.add_argument(
+        "--to-es",
+        action="store_true",
+        help=(
+            "Indexer aussi les anomalies dans Elasticsearch (visibles dans "
+            "Kibana). Lit ES_HOST/ES_USERNAME/ES_PASSWORD/ES_INDEX_PREFIX "
+            "depuis l'environnement ou un fichier .env."
+        ),
+    )
 
 
 def _cmd_version() -> int:
@@ -251,7 +260,10 @@ def _cmd_detect(args: argparse.Namespace) -> int:
     records = pipeline.predict(vectors)
     print(f"[ueba] Fenêtres      : {len(records)} (utilisateur × fenêtre)")
 
-    return _emit_anomalies(records, Path(args.output))
+    rc = _emit_anomalies(records, Path(args.output))
+    if getattr(args, "to_es", False):
+        rc = _index_anomalies_to_es(records) or rc
+    return rc
 
 
 def _check_input(input_path: Path) -> bool:
@@ -293,6 +305,41 @@ def _emit_anomalies(records: list[AnomalyRecord], output_path: Path) -> int:
 
     _write_anomalies(anomalies, output_path)
     print(f"[ueba] Résultats     : {output_path} ({len(anomalies)} anomalies)")
+    return 0
+
+
+def _load_dotenv(path: str = ".env") -> None:
+    """Charge un fichier .env (KEY=VALUE) dans l'environnement, sans dépendance.
+
+    Les variables déjà présentes dans l'environnement ont la priorité (on
+    n'écrase pas un secret injecté par le système).
+    """
+    import os
+
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+def _index_anomalies_to_es(records: list[AnomalyRecord]) -> int:
+    """Indexe les anomalies détectées dans Elasticsearch ; retourne 0 si OK, 1 sinon."""
+    from ueba.infrastructure.elastic_writer import ElasticWriter, ElasticWriterError
+
+    _load_dotenv()
+    anomalies = [r for r in records if r.is_anomaly]
+    try:
+        writer = ElasticWriter.from_env()
+        n = writer.bulk_index_anomalies(anomalies)
+    except ElasticWriterError as exc:
+        print(f"Erreur Elasticsearch : {exc}", file=sys.stderr)
+        return 1
+    print(f"[ueba] Elasticsearch : {n} anomalie(s) indexée(s) dans l'index ueba-anomalies-*")
     return 0
 
 

@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ueba.domain.features import FeatureVector
     from ueba.domain.mitre import MitreMatch
+    from ueba.pipeline import AnomalyRecord
 
 
 class ElasticWriterError(Exception):
@@ -147,6 +148,61 @@ class ElasticWriter:
             failed = len(items) - indexed
             raise ElasticWriterError(f"Bulk indexation partielle : {indexed} OK, {failed} erreurs")
         return indexed
+
+    def bulk_index_anomalies(self, records: list[AnomalyRecord]) -> int:
+        """Indexe des verdicts d'anomalies (détection) en bulk dans Elasticsearch.
+
+        Contrairement à :meth:`bulk_index` (centré features + MITRE), cette
+        méthode indexe le **verdict** orienté analyste SOC : utilisateur,
+        fenêtre, décision, modèle utilisé et votes des sous-modèles — de quoi
+        trier l'alerte dans Kibana.
+
+        Paramètres
+        ----------
+        records : list[AnomalyRecord]
+            Verdicts à indexer (typiquement filtrés sur ``is_anomaly``).
+
+        Retours
+        -------
+        int
+            Nombre de documents indexés avec succès.
+        """
+        if not records:
+            return 0
+
+        date_str = datetime.now(tz=timezone.utc).strftime("%Y.%m.%d")
+        index = f"{self._index_prefix}-{date_str}"
+
+        lines: list[str] = []
+        for record in records:
+            lines.append(json.dumps({"index": {"_index": index}}))
+            lines.append(json.dumps(self._anomaly_doc(record), ensure_ascii=False))
+
+        body = "\n".join(lines) + "\n"
+        result = self._post_bulk(body)
+        items = result.get("items", [])
+        indexed = sum(1 for item in items if item.get("index", {}).get("status") in (200, 201))
+        if result.get("errors", False):
+            failed = len(items) - indexed
+            raise ElasticWriterError(f"Bulk indexation partielle : {indexed} OK, {failed} erreurs")
+        return indexed
+
+    @staticmethod
+    def _anomaly_doc(record: AnomalyRecord) -> dict[str, Any]:
+        """Construit le document Elasticsearch d'un verdict d'anomalie."""
+        return {
+            "@timestamp": record.window_start.isoformat() + "Z",
+            "ueba": {
+                "user": record.user,
+                "window_start": record.window_start.isoformat(),
+                "window_end": record.window_end.isoformat(),
+                "is_anomaly": record.is_anomaly,
+                "mode": record.mode,
+                "used_model": record.used_model,
+                "vote_count": record.vote_count,
+                "votes": record.votes,
+            },
+        }
 
     def _post_bulk(self, ndjson_body: str) -> dict[str, Any]:
         url = f"{self._host}/_bulk"
