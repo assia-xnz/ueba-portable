@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ueba-portable"
-version = "0.2.0"
+version = "0.2.1"
 description = "Système UEBA portable pour la chasse aux menaces, basé sur l'apprentissage automatique non supervisé, intégré à un SIEM et mappé au framework MITRE ATT&CK"
 authors = ["assia-xnz <sia.el2020@gmail.com>"]
 license = "MIT"

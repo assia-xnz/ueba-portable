@@ -144,6 +144,16 @@ class UEBAPipeline:
         """Mode d'apprentissage actif du pipeline."""
         return self._mode
 
+    @property
+    def ensemble_mode(self) -> EnsembleMode:
+        """Alias de :attr:`mode` (cohérent avec l'argument du constructeur)."""
+        return self._mode
+
+    @property
+    def ensemble(self) -> AnomalyEnsemble | PerUserAnomalyEnsemble | None:
+        """Ensemble sous-jacent (``None`` tant que le pipeline n'est ni entraîné ni chargé)."""
+        return self._ensemble
+
     def extract(self, events: list[NormalizedEvent]) -> list[FeatureVector]:
         """Extrait les vecteurs de features (utilisateur × fenêtre) des événements."""
         return self._engine.extract(events)
