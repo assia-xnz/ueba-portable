@@ -123,6 +123,33 @@ class TestPerUserMode:
         assert record.votes is None
         assert record.vote_count is None
 
+    def test_train_ratio_is_forwarded_to_per_user(self) -> None:
+        # Le pipeline propage train_ratio : 1.0 entraîne l'utilisateur,
+        # une valeur trop faible le laisse non entraîné (→ default-deny).
+        vectors = _make_user_windows("u", 2, base=5.0, seed=0)
+
+        full = UEBAPipeline(
+            window_size=_WINDOW,
+            window_step=_WINDOW,
+            ensemble_mode="per-user",
+            min_windows_per_user=2,
+            train_ratio=1.0,
+            n_estimators=50,
+        )
+        full.fit(vectors)
+        assert all(r.used_model == "u" for r in full.predict(vectors))
+
+        tiny = UEBAPipeline(
+            window_size=_WINDOW,
+            window_step=_WINDOW,
+            ensemble_mode="per-user",
+            min_windows_per_user=2,
+            train_ratio=0.4,
+            n_estimators=50,
+        )
+        tiny.fit(vectors)
+        assert all(r.used_model == "unknown" for r in tiny.predict(vectors))
+
 
 class TestGlobalMode:
     """Mode global : un unique modèle pour toute la population."""

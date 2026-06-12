@@ -172,6 +172,19 @@ class TestFiltering:
         assert ensemble.is_fitted is True
         assert "solo" not in ensemble.trained_users
 
+    def test_train_ratio_controls_training_size(self) -> None:
+        # train_ratio honoré : 1.0 → toutes les fenêtres servent au train ;
+        # une valeur trop faible → sous-ensemble vide → utilisateur ignoré.
+        vectors = _make_user_windows("u", 2, seed=0)
+
+        full = PerUserAnomalyEnsemble(min_windows_per_user=2, train_ratio=1.0, n_estimators=50)
+        full.fit(vectors)
+        assert "u" in full.trained_users
+
+        tiny = PerUserAnomalyEnsemble(min_windows_per_user=2, train_ratio=0.4, n_estimators=50)
+        tiny.fit(vectors)
+        assert "u" not in tiny.trained_users
+
 
 class TestChronologicalOrdering:
     """Le split d'apprentissage respecte la flèche du temps, quel que soit l'ordre d'entrée."""

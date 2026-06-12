@@ -289,17 +289,32 @@ historique. C'est la véritable UEBA personnalisée, conforme à la littérature
 par rapport à *sa* normalité, pas à celle des autres. Un utilisateur jamais
 vu à l'apprentissage déclenche une alerte par défaut (*default-deny*).
 
+#### Workflow SOC recommandé : apprendre le « normal », puis détecter
+
+C'est le mode d'emploi d'un analyste SOC : on apprend la baseline sur une
+période **propre** (sans incident connu), on **fige** le modèle, puis on
+détecte sur des données nouvelles. Tout écart à la normalité apprise devient
+une alerte.
+
 ```bash
-# Apprentissage + détection en une passe (fournir un export déjà nettoyé en amont)
+# 1) APPRENDRE le normal sur une période propre (sans attaque) — sur 100% des données
+poetry run ueba train --input baseline_propre.csv --mode per-user \
+    --train-ratio 1.0 --save-model models/baseline.joblib
+
+# 2) DÉTECTER sur des données live (nouveau jour, nouvel export)
+poetry run ueba detect --input live.csv \
+    --load-model models/baseline.joblib --output alertes.json
+```
+
+> La commande `train` utilise par défaut `--train-ratio 1.0` : elle apprend
+> sur **l'intégralité** du jeu propre fourni. La préparation d'un dataset sans
+> incident relève de l'utilisateur (séparation des préoccupations).
+
+Pour une évaluation rapide (apprentissage **et** scoring sur le même export,
+avec holdout 80/20) :
+
+```bash
 poetry run ueba run data/raw/export.csv --mode per-user --output anomalies.json
-
-# Apprentissage seul, puis sauvegarde du modèle
-poetry run ueba train --input data/raw/export.csv --mode per-user \
-    --save-model models/per_user.joblib
-
-# Détection à partir d'un modèle sauvegardé
-poetry run ueba detect --input data/raw/new.csv \
-    --load-model models/per_user.joblib --output anomalies.json
 ```
 
 ### Résultats comparés (dataset Wazuh réel, 14 jours, T1110.003)

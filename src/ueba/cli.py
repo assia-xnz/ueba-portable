@@ -80,7 +80,7 @@ def _add_window_args(p: argparse.ArgumentParser) -> None:
 
 
 def _add_mode_args(p: argparse.ArgumentParser) -> None:
-    """Ajoute l'argument de mode d'apprentissage."""
+    """Ajoute les arguments de mode d'apprentissage et de seuil de baseline."""
     p.add_argument(
         "--mode",
         choices=["per-user", "global"],
@@ -89,6 +89,16 @@ def _add_mode_args(p: argparse.ArgumentParser) -> None:
             "Mode d'apprentissage. 'per-user' (défaut, recommandé) : un modèle "
             "dédié par utilisateur, véritable UEBA personnalisée. 'global' : un "
             "unique modèle pour toute la population (baseline collective biaisée)."
+        ),
+    )
+    p.add_argument(
+        "--min-windows-per-user",
+        type=int,
+        default=30,
+        help=(
+            "Mode per-user : nombre minimal de fenêtres pour qu'un utilisateur "
+            "obtienne un modèle dédié (défaut : 30). En deçà, l'entité est "
+            "traitée en default-deny. À calibrer selon la longueur de la baseline."
         ),
     )
 
@@ -103,6 +113,15 @@ def _add_run_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) ->
     )
     _add_window_args(run_p)
     _add_mode_args(run_p)
+    run_p.add_argument(
+        "--train-ratio",
+        type=float,
+        default=0.8,
+        help=(
+            "Part chronologique des fenêtres servant à l'apprentissage en mode "
+            "per-user (défaut : 0.8, le reste sert de holdout pour le scoring)."
+        ),
+    )
 
 
 def _add_train_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -113,6 +132,16 @@ def _add_train_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     )
     _add_window_args(train_p)
     _add_mode_args(train_p)
+    train_p.add_argument(
+        "--train-ratio",
+        type=float,
+        default=1.0,
+        help=(
+            "Part chronologique des fenêtres servant à l'apprentissage en mode "
+            "per-user (défaut : 1.0 — apprend sur l'INTÉGRALITÉ du jeu propre "
+            "fourni, pour une baseline 'normale' complète)."
+        ),
+    )
 
 
 def _add_detect_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -232,6 +261,8 @@ def _build_pipeline(args: argparse.Namespace) -> UEBAPipeline:
         window_step=timedelta(minutes=args.step_minutes),
         lookback_days=args.lookback_days,
         ensemble_mode=args.mode,
+        min_windows_per_user=getattr(args, "min_windows_per_user", 30),
+        train_ratio=getattr(args, "train_ratio", 0.8),
     )
 
 
