@@ -25,9 +25,10 @@
 10. [Mapping MITRE ATT&CK](#10-mapping-mitre-attck)
 11. [Ajouter un nouveau SIEM](#11-ajouter-un-nouveau-siem)
 12. [Configuration `.env`](#12-configuration-env)
-13. [Structure du projet](#13-structure-du-projet)
-14. [Contribuer](#14-contribuer)
-15. [Licence](#15-licence)
+13. [Exploitation SOC : MTTD, risk scoring, dashboards & surveillance continue](#13-exploitation-soc--mttd-risk-scoring-dashboards--surveillance-continue)
+14. [Structure du projet](#14-structure-du-projet)
+15. [Contribuer](#15-contribuer)
+16. [Licence](#16-licence)
 
 ---
 
@@ -124,7 +125,7 @@ poetry install
 ### Vérification
 
 ```bash
-poetry run pytest            # 174 tests, couverture > 80 %
+poetry run pytest            # 211 tests, couverture globale 97 %
 poetry run ueba version
 ```
 
@@ -462,7 +463,91 @@ Les valeurs sont lues par `src/ueba/infrastructure/config.py` via `python-dotenv
 
 ---
 
-## 13. Structure du projet
+## 13. Exploitation SOC : MTTD, risk scoring, dashboards & surveillance continue
+
+Au-delà de la détection, le projet fournit la couche **exploitation SOC** attendue
+en production : mesure du délai de détection, scoring du risque, tableaux de bord
+Kibana et surveillance continue automatisée.
+
+### 13.1 MTTD — Mean Time To Detect
+
+`src/ueba/metrics/mttd.py` (`MTTDCalculator`) mesure le délai entre le début connu
+d'une attaque et la première détection émise pour chaque utilisateur ciblé.
+
+```bash
+python scripts/calculate_mttd.py     # calcule, affiche, sauvegarde et indexe (ueba-mttd)
+```
+
+> Sur la campagne T1110.003 (1ʳᵉ vague, 13 mai 11h00) : **MTTD global = 14.9 min**,
+> recall opérationnel **7/7 (100 %)**. Résultat indexé dans l'index `ueba-mttd`.
+
+### 13.2 Risk score & niveaux d'alerte
+
+`src/ueba/scoring/risk.py` (`RiskScorer`) transforme le verdict ML en un **score de
+risque 0–100** (consensus ML × intensité), puis en **niveau d'alerte** :
+
+| Niveau | Seuil `risk_score` |
+|---|---|
+| CRITIQUE | ≥ 80 |
+| ÉLEVÉ | ≥ 60 |
+| MOYEN | ≥ 40 |
+| FAIBLE | < 40 |
+
+```bash
+python scripts/enrich_risk_levels.py   # enrichit ueba-anomalies-* (risk_score + risk_level)
+```
+
+> Distribution obtenue (7 utilisateurs ciblés) : **126 CRITIQUE, 275 ÉLEVÉ, 94 MOYEN**
+> — 6 utilisateurs atteignent le niveau CRITIQUE.
+
+### 13.3 Dashboards Kibana
+
+Dashboards Lens natifs, auto-suffisants (les data views sont inclus dans le `.ndjson`),
+générés par script pour être reproductibles :
+
+| Fichier | Dashboard | Contenu |
+|---|---|---|
+| `docs/kibana/ueba-dashboard-v2.ndjson` | « UEBA — SOC Dashboard » | 7 visualisations (timeline, KPIs, MITRE, top users, heatmap, table) |
+| `docs/kibana/ueba-dashboard-v3.ndjson` | « UEBA — SOC Dashboard v3 » | 12 visualisations = v2 **+** KPI MTTD, table MTTD, bar risk score, pie niveaux d'alerte, KPI users CRITIQUE |
+
+```bash
+# Génération (optionnel) puis import dans Kibana
+python docs/kibana/generate_dashboard_v3.py
+curl -s -u "$ES_USERNAME:$ES_PASSWORD" \
+  "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
+  -H "kbn-xsrf: true" --form file=@docs/kibana/ueba-dashboard-v3.ndjson
+```
+
+> Pré-requis données : rejouer `enrich_mitre.sh`, `enrich_risk_levels.py` et
+> `calculate_mttd.py` si l'index `ueba-anomalies-*` est recréé, sinon les
+> visualisations MITRE / risk / MTTD seront vides. Le champ `risk_level` étant
+> mappé dynamiquement en `text`, les agrégations Kibana utilisent `risk_level.keyword`.
+
+### 13.4 Simulation d'attaque & démonstration
+
+| Script | Rôle |
+|---|---|
+| `scripts/simulate_attack.ps1` | Password spraying T1110.003 en laboratoire (génère des 4625) — **usage pédagogique uniquement** |
+| `scripts/export_recent_logs.py` | Exporte `wazuh-alerts-*` (N dernières minutes) au format CSV WazuhAdapter |
+| `scripts/demo_soutenance.sh` | Démonstration bout-en-bout : export → `ueba detect --to-es` → URL Kibana |
+
+### 13.5 Surveillance continue (cron / systemd)
+
+`scripts/continuous_detect.sh` enchaîne export → détection → indexation toutes les
+30 minutes. Deux modes de déploiement (détaillés dans [`docs/deployment.md`](docs/deployment.md)) :
+
+```bash
+# Option A — crontab
+*/30 * * * * /bin/bash ~/ueba-portable/scripts/continuous_detect.sh
+
+# Option B — systemd (recommandé)
+sudo cp ueba-detect.service ueba-detect.timer /etc/systemd/system/
+sudo systemctl enable --now ueba-detect.timer
+```
+
+---
+
+## 14. Structure du projet
 
 ```
 ueba-portable/
@@ -482,20 +567,34 @@ ueba-portable/
 │   │   ├── per_user_ensemble.py  # PerUserAnomalyEnsemble (un modèle par utilisateur)
 │   │   └── mitre.py       # MitreMapper (heuristiques + signal SIEM + population)
 │   ├── scoring/
-│   │   └── rolling_baseline.py  # RollingBaselineEngine (baseline glissante N-day)
-│   ├── infrastructure/    # I/O, config YAML/.env, logging structuré
+│   │   ├── rolling_baseline.py  # RollingBaselineEngine (baseline glissante N-day)
+│   │   └── risk.py        # RiskScorer + RiskLevel (score 0–100, niveaux d'alerte)
+│   ├── metrics/
+│   │   └── mttd.py        # MTTDCalculator + MTTDReport (Mean Time To Detect)
+│   ├── infrastructure/    # I/O, config YAML/.env, logging, ElasticWriter
 │   ├── cli.py             # Entrée CLI `ueba run` / `train` / `detect` / `version`
 │   └── pipeline.py        # UEBAPipeline (orchestration extract → fit → predict, global/per-user)
 ├── tests/
-│   ├── unit/              # Tests unitaires (161 au total, couverture > 80 %)
+│   ├── unit/              # Tests unitaires (dont test_mttd.py, test_risk_scoring.py)
 │   └── integration/
 │       ├── fixtures/
 │       │   └── sample_logs.csv   # 103 événements synthétiques, 7 utilisateurs
 │       ├── test_password_spray_detection.py
 │       └── test_pipeline.py      # Pipeline bout-en-bout (global + per-user)
+│   # 211 tests au total, couverture globale 97 %
 ├── notebooks/             # Exploration, analyse des features, visualisation
-├── scripts/               # run_pipeline.py, generate_attack_scenarios.py
-├── docs/                  # Architecture, data flow, couverture MITRE
+├── scripts/               # Pipeline + exploitation SOC :
+│   ├── calculate_mttd.py        # MTTD depuis ES → index ueba-mttd
+│   ├── enrich_risk_levels.py    # risk_score + risk_level sur ueba-anomalies-*
+│   ├── export_recent_logs.py    # wazuh-alerts-* → CSV WazuhAdapter
+│   ├── simulate_attack.ps1      # Password spraying T1110.003 (labo)
+│   ├── demo_soutenance.sh       # Démo bout-en-bout
+│   └── continuous_detect.sh     # Surveillance continue (cron/systemd)
+├── docs/
+│   ├── kibana/            # Dashboards Lens + générateurs + enrich_mitre.sh
+│   └── deployment.md      # Déploiement, cron, systemd
+├── ueba-detect.service    # Unité systemd (surveillance continue)
+├── ueba-detect.timer      # Timer systemd (toutes les 30 min)
 ├── .github/workflows/     # CI GitHub Actions (Python 3.10/3.11/3.12)
 ├── pyproject.toml         # Dépendances Poetry + config outils
 └── .env.example           # Template de configuration (à copier en .env)
@@ -503,7 +602,7 @@ ueba-portable/
 
 ---
 
-## 14. Contribuer
+## 15. Contribuer
 
 ```bash
 # Installer les dépendances de développement
@@ -524,7 +623,7 @@ Les pull requests doivent maintenir la couverture de tests > 80 % et passer tous
 
 ---
 
-## 15. Licence
+## 16. Licence
 
 Ce projet est distribué sous licence **MIT**. Voir le fichier [`LICENSE`](LICENSE).
 
