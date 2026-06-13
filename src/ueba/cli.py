@@ -246,6 +246,18 @@ def _cmd_detect(args: argparse.Namespace) -> int:
         print(f"Erreur : modèle introuvable : {model_path}", file=sys.stderr)
         return 1
 
+    # Vérification d'intégrité avant désérialisation pickle (défense SEC-11).
+    from ueba.infrastructure.integrity import IntegrityError, verify_checksum
+
+    try:
+        if verify_checksum(model_path):
+            print("[ueba] Intégrité     : empreinte SHA-256 vérifiée ✓")
+        else:
+            print("[ueba] Intégrité     : aucune empreinte .sha256 (chargement non vérifié)")
+    except IntegrityError as exc:
+        print(f"Erreur d'intégrité : {exc}", file=sys.stderr)
+        return 1
+
     from ueba.pipeline import UEBAPipeline
 
     pipeline = UEBAPipeline.load_model(str(model_path))

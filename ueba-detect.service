@@ -5,6 +5,8 @@ Description=UEBA continuous anomaly detection
 Documentation=https://github.com/assia-xnz/ueba-portable
 After=network-online.target
 Wants=network-online.target
+# Surveillance du détecteur : notifie si un cycle échoue (dead-man-switch, SOC-10).
+OnFailure=ueba-detect-failure.service
 
 [Service]
 Type=oneshot
@@ -16,6 +18,8 @@ Environment=UEBA_HOME=/home/soc/ueba-portable
 Environment=MODEL_PATH=/home/soc/ueba-portable/models/ueba-model.joblib
 Environment=LOG_FILE=/var/log/ueba/detect.log
 ExecStart=/bin/bash /home/soc/ueba-portable/scripts/continuous_detect.sh
+# Garde-fou : un cycle ne doit jamais traîner indéfiniment.
+TimeoutStartSec=900
 # Durcissement minimal.
 NoNewPrivileges=true
 PrivateTmp=true

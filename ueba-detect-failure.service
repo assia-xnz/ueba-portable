@@ -1,0 +1,15 @@
+[Unit]
+# Déclenché par OnFailure= de ueba-detect.service : signale qu'un cycle de
+# détection a échoué (le détecteur est un angle mort s'il s'arrête en silence).
+Description=UEBA detection failure notifier
+Documentation=https://github.com/assia-xnz/ueba-portable
+
+[Service]
+Type=oneshot
+User=soc
+WorkingDirectory=/home/soc/ueba-portable
+EnvironmentFile=/home/soc/ueba-portable/.env
+# Journalise l'échec ; brancher ici un appel webhook/mail pour une vraie alerte SOC.
+ExecStart=/bin/sh -c 'echo "[$(date -Is)] ALERTE: ueba-detect.service a échoué" >> /var/log/ueba/detect.log'
+NoNewPrivileges=true
+PrivateTmp=true

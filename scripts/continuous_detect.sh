@@ -44,8 +44,32 @@ python3 scripts/export_recent_logs.py --minutes "$WINDOW_MIN" --output "$RECENT_
 log "Détection UEBA + indexation Elasticsearch..."
 if ueba detect --input "$RECENT_CSV" --load-model "$MODEL_PATH" \
     --output "$ANOMALIES_JSON" --to-es >>"$LOG_FILE" 2>&1; then
-    log "Cycle terminé avec succès."
+    log "Détection terminée avec succès."
 else
     log "ERREUR : la détection a échoué (voir le log ci-dessus)."
     exit 1
 fi
+
+# Notification des alertes CRITIQUE (best-effort, n'échoue pas le cycle).
+log "Notification des alertes CRITIQUE..."
+python3 scripts/notify_critical.py --minutes "$WINDOW_MIN" >>"$LOG_FILE" 2>&1 \
+    || log "AVERTISSEMENT : notification indisponible (cycle poursuivi)."
+
+# Heartbeat + métrique de cycle dans ES (surveillance du détecteur lui-même, SOC-10/11).
+python3 - "$WINDOW_MIN" >>"$LOG_FILE" 2>&1 <<'PY' || log "AVERTISSEMENT : heartbeat non indexé."
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd() / "src"))
+from datetime import datetime, timezone
+from ueba.infrastructure.es_client import ESClient, load_dotenv
+load_dotenv(Path.cwd() / ".env")
+client = ESClient.from_env()
+now = datetime.now(tz=timezone.utc).isoformat()
+client.bulk([
+    '{"index": {"_index": "ueba-heartbeat"}}',
+    f'{{"@timestamp": "{now}", "status": "ok", "window_minutes": {int(sys.argv[1])}}}',
+], refresh=True)
+print("[*] Heartbeat indexé dans ueba-heartbeat")
+PY
+
+log "Cycle terminé avec succès."
