@@ -20,10 +20,15 @@ from base64 import b64encode
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from ueba.scoring.risk import RiskScorer, recommended_action
+
 if TYPE_CHECKING:
     from ueba.domain.features import FeatureVector
     from ueba.domain.mitre import MitreMatch
     from ueba.pipeline import AnomalyRecord
+
+#: Scoreur partagé pour l'enrichissement de risque à l'indexation.
+_RISK_SCORER = RiskScorer()
 
 
 class ElasticWriterError(Exception):
@@ -175,7 +180,9 @@ class ElasticWriter:
 
         lines: list[str] = []
         for record in records:
-            lines.append(json.dumps({"index": {"_index": index}}))
+            # _id déterministe : ré-indexer la même fenêtre écrase au lieu de dupliquer.
+            doc_id = f"{record.user}_{record.window_start.isoformat()}"
+            lines.append(json.dumps({"index": {"_index": index, "_id": doc_id}}))
             lines.append(json.dumps(self._anomaly_doc(record), ensure_ascii=False))
 
         body = "\n".join(lines) + "\n"
@@ -189,7 +196,14 @@ class ElasticWriter:
 
     @staticmethod
     def _anomaly_doc(record: AnomalyRecord) -> dict[str, Any]:
-        """Construit le document Elasticsearch d'un verdict d'anomalie."""
+        """Construit le document Elasticsearch d'un verdict d'anomalie.
+
+        Le risque (``risk_score``/``risk_level``/``recommended_action``) est calculé
+        dès l'indexation via :class:`RiskScorer` à partir du consensus ML, avec un
+        contexte de menace par défaut. Le script ``enrich_risk_levels.py`` peut
+        ensuite l'affiner avec la criticité de la technique MITRE mappée.
+        """
+        assessment = _RISK_SCORER.assess(record.vote_count)
         return {
             "@timestamp": record.window_start.isoformat() + "Z",
             "ueba": {
@@ -202,6 +216,9 @@ class ElasticWriter:
                 "vote_count": record.vote_count,
                 "votes": record.votes,
             },
+            "risk_score": assessment.risk_score,
+            "risk_level": assessment.risk_level.value,
+            "recommended_action": recommended_action(assessment.risk_level),
         }
 
     def _post_bulk(self, ndjson_body: str) -> dict[str, Any]:

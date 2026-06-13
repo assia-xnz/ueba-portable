@@ -36,6 +36,14 @@ class TestAnomalyDoc:
         assert ueba["vote_count"] == 3
         assert ueba["votes"]["isolation_forest"] is True
 
+    def test_doc_carries_risk_fields(self) -> None:
+        """Le risque est calculé dès l'indexation (RiskScorer câblé au flux live)."""
+        doc = ElasticWriter._anomaly_doc(_record())
+        # 3/3 votes + contexte par défaut 0.5 -> 80.0 = CRITIQUE
+        assert doc["risk_score"] == 80.0
+        assert doc["risk_level"] == "CRITIQUE"
+        assert doc["recommended_action"]
+
     def test_doc_is_json_serializable(self) -> None:
         import json
 
