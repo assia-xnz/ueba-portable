@@ -221,7 +221,7 @@ class ElasticWriter:
             "recommended_action": recommended_action(assessment.risk_level),
         }
 
-    def _post_bulk(self, ndjson_body: str) -> dict[str, Any]:
+    def _post_bulk(self, ndjson_body: str) -> dict[str, Any]:  # pragma: no cover - I/O réseau
         url = f"{self._host}/_bulk"
         req = urllib.request.Request(
             url,

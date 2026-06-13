@@ -137,7 +137,7 @@ class ESClient:
             return ctx
         return None
 
-    def _urlopen(self, req: urllib.request.Request) -> bytes:
+    def _urlopen(self, req: urllib.request.Request) -> bytes:  # pragma: no cover - I/O réseau
         """Exécute la requête et renvoie le corps brut. Point d'injection des tests."""
         with urllib.request.urlopen(req, timeout=self._timeout, context=self._ssl_context()) as r:
             return r.read()  # type: ignore[no-any-return]

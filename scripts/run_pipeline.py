@@ -59,6 +59,7 @@ def main() -> int:
         return 1
 
     from ueba.adapters.registry import get_adapter
+    from ueba.domain.features import FEATURE_NAMES
     from ueba.domain.mitre import MitreMapper
     from ueba.scoring.rolling_baseline import RollingBaselineEngine
 
@@ -79,30 +80,12 @@ def main() -> int:
     results: list[dict] = []  # type: ignore[type-arg]
     mapper = MitreMapper()
 
-    feature_names = [
-        "login_count",
-        "failed_login_count",
-        "failed_login_ratio",
-        "unique_hosts",
-        "unique_logon_types",
-        "process_entropy",
-        "unique_processes",
-        "process_count",
-        "priv_logon_count",
-        "kerberos_count",
-        "off_hours_ratio",
-        "weekend_ratio",
-        "login_velocity",
-        "host_velocity",
-        "z_login_count",
-        "z_process_count",
-    ]
     for v in vectors:
         entry: dict = {  # type: ignore[type-arg]
             "user": v.user,
             "window_start": v.window_start.isoformat(),
             "window_end": v.window_end.isoformat(),
-            "features": dict(zip(feature_names, v.to_vector(), strict=False)),
+            "features": dict(zip(FEATURE_NAMES, v.to_vector(), strict=False)),
         }
         if args.mitre:
             matches = mapper.match_individual(v)

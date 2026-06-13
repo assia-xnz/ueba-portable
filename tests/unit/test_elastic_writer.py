@@ -50,6 +50,44 @@ class TestAnomalyDoc:
         json.dumps(ElasticWriter._anomaly_doc(_record()))
 
 
+class TestBulkIndexAnomalies:
+    """Logique d'indexation bulk (sans réseau : _post_bulk monkeypatché)."""
+
+    def _writer(self) -> ElasticWriter:
+        return ElasticWriter(host="https://es:9200", username="elastic", password="pw")
+
+    def test_empty_records_returns_zero(self) -> None:
+        assert self._writer().bulk_index_anomalies([]) == 0
+
+    def test_uses_deterministic_id_and_counts(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+        writer = self._writer()
+        captured: dict[str, str] = {}
+
+        def fake_post(body: str) -> dict:
+            captured["body"] = body
+            return {"errors": False, "items": [{"index": {"status": 201}}]}
+
+        monkeypatch.setattr(writer, "_post_bulk", fake_post)
+        indexed = writer.bulk_index_anomalies([_record()])
+        assert indexed == 1
+        # _id déterministe présent dans l'action bulk
+        assert '"_id": "a.amrani_2026-05-16T14:00:00"' in captured["body"]
+
+    def test_partial_failure_raises(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+        writer = self._writer()
+        monkeypatch.setattr(
+            writer,
+            "_post_bulk",
+            lambda body: {"errors": True, "items": [{"index": {"status": 400}}]},
+        )
+        try:
+            writer.bulk_index_anomalies([_record()])
+        except Exception as exc:  # noqa: BLE001
+            assert "partielle" in str(exc)
+        else:
+            raise AssertionError("ElasticWriterError attendue")
+
+
 class TestDotenvLoader:
     """Chargement d'un fichier .env sans dépendance."""
 

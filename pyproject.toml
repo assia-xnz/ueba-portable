@@ -60,7 +60,8 @@ pythonpath = ["src"]
 branch = true
 source = ["src/ueba"]
 omit = [
-    "src/ueba/infrastructure/*",          # I/O, config, ES writer — require external services
-    "src/ueba/adapters/elasticsearch_api.py",  # requires live Elasticsearch
-    "src/ueba/cli.py",                    # entry-point — covered by integration
+    "src/ueba/cli.py",   # point d'entrée argparse — couvert par les tests d'intégration
 ]
+# Les portions purement réseau (ESClient._urlopen, ElasticWriter._post_bulk) sont
+# exclues au niveau ligne via « # pragma: no cover », pas par fichier : la logique
+# testable de l'infrastructure (config, io, logging, es_client, writer) est couverte.

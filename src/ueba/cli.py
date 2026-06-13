@@ -182,11 +182,12 @@ def _add_detect_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser])
 
 
 def _cmd_version() -> int:
+    from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as pkg_version
 
     try:
         print(pkg_version("ueba-portable"))
-    except Exception:
+    except PackageNotFoundError:
         print("ueba-portable (version inconnue — paquet non installé)")
     return 0
 
