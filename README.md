@@ -125,7 +125,7 @@ poetry install
 ### Vérification
 
 ```bash
-poetry run pytest            # 211 tests, couverture globale 97 %
+poetry run pytest            # 259 tests, couverture globale 94 % (réelle, infra incluse)
 poetry run ueba version
 ```
 
@@ -337,6 +337,17 @@ poetry run ueba run data/raw/export.csv --mode per-user --output anomalies.json
 > flaguée à 100 % des fenêtres). Analyse détaillée :
 > [`docs/per_user_vs_global.md`](docs/per_user_vs_global.md).
 
+> **Honnêteté méthodologique (cf. [`docs/AUDIT.md`](docs/AUDIT.md)) :** un rappel
+> élevé n'a de sens que présenté **avec** sa précision et son taux de faux
+> positifs — le FP rate de 31,6 % en per-user est élevé et reflète en partie le
+> *default-deny* (utilisateurs sous le seuil de fenêtres) et le seuil au 95ᵉ
+> percentile de l'autoencodeur. Le module `ueba.metrics.classification`
+> (`ConfusionMatrix` → precision/recall/F1/FPR) sert à produire ces chiffres de
+> façon équilibrée. Les métriques publiées doivent être calculées sur un
+> protocole **sans fuite** (train sur période propre hors 13/16 mai, test sur les
+> vagues d'attaque) via `ueba train`/`ueba detect` — et **non** via `ueba run`
+> (qui score aussi les fenêtres d'entraînement).
+
 ---
 
 ## 9. Validation : détection du Password Spray (T1110.003)
@@ -466,25 +477,39 @@ Les valeurs sont lues par `src/ueba/infrastructure/config.py` via `python-dotenv
 ## 13. Exploitation SOC : MTTD, risk scoring, dashboards & surveillance continue
 
 Au-delà de la détection, le projet fournit la couche **exploitation SOC** attendue
-en production : mesure du délai de détection, scoring du risque, tableaux de bord
-Kibana et surveillance continue automatisée.
+en production : provisionnement ES, mesure du délai de détection, scoring du risque,
+tableaux de bord Kibana, notification et surveillance continue automatisée.
+
+### 13.0 Orchestration & provisionnement
+
+Un `Makefile` rend le cycle reproductible ; `make help` liste les cibles
+(`setup-es`, `train`, `detect`, `enrich`, `mttd`, `notify`, `dashboards`, `demo`).
+Avant toute indexation, **provisionner Elasticsearch** (politique ILM de rétention
++ index templates explicites — corrige la croissance illimitée des index et le
+typage dynamique non déterministe) :
+
+```bash
+make setup-es        # ILM + index templates (idempotent) — voir scripts/setup_es.py
+```
 
 ### 13.1 MTTD — Mean Time To Detect
 
 `src/ueba/metrics/mttd.py` (`MTTDCalculator`) mesure le délai entre le début connu
-d'une attaque et la première détection émise pour chaque utilisateur ciblé.
+d'une attaque et la première détection. Le MTTD est calculé **par vague** (l'attaque
+a eu lieu les 13 *et* 16 mai) puis agrégé.
 
 ```bash
-python scripts/calculate_mttd.py     # calcule, affiche, sauvegarde et indexe (ueba-mttd)
+make mttd            # = python scripts/calculate_mttd.py (indexe ueba-mttd, idempotent)
 ```
 
-> Sur la campagne T1110.003 (1ʳᵉ vague, 13 mai 11h00) : **MTTD global = 14.9 min**,
-> recall opérationnel **7/7 (100 %)**. Résultat indexé dans l'index `ueba-mttd`.
+> Campagne T1110.003 : **vague 1 (13 mai) = 14.9 min**, **vague 2 (16 mai) = 74.9 min**,
+> **MTTD global = 44.9 min**, recall opérationnel **14/14 (100 %)**.
 
 ### 13.2 Risk score & niveaux d'alerte
 
 `src/ueba/scoring/risk.py` (`RiskScorer`) transforme le verdict ML en un **score de
-risque 0–100** (consensus ML × intensité), puis en **niveau d'alerte** :
+risque 0–100** combinant le **consensus ML** et un **contexte de menace indépendant**
+(criticité de la technique MITRE mappée), puis en **niveau d'alerte** :
 
 | Niveau | Seuil `risk_score` |
 |---|---|
@@ -493,12 +518,13 @@ risque 0–100** (consensus ML × intensité), puis en **niveau d'alerte** :
 | MOYEN | ≥ 40 |
 | FAIBLE | < 40 |
 
-```bash
-python scripts/enrich_risk_levels.py   # enrichit ueba-anomalies-* (risk_score + risk_level)
-```
+Le score est **reproductible** (aucune normalisation relative au lot) ; chaque
+anomalie reçoit aussi une `recommended_action`. Le risque est calculé **dès
+l'indexation** (`ElasticWriter`) puis affiné par technique MITRE via :
 
-> Distribution obtenue (7 utilisateurs ciblés) : **126 CRITIQUE, 275 ÉLEVÉ, 94 MOYEN**
-> — 6 utilisateurs atteignent le niveau CRITIQUE.
+```bash
+make enrich          # enrich_mitre.sh + enrich_risk_levels.py (risk_score/level/action)
+```
 
 ### 13.3 Dashboards Kibana
 
@@ -531,19 +557,41 @@ curl -s -u "$ES_USERNAME:$ES_PASSWORD" \
 | `scripts/export_recent_logs.py` | Exporte `wazuh-alerts-*` (N dernières minutes) au format CSV WazuhAdapter |
 | `scripts/demo_soutenance.sh` | Démonstration bout-en-bout : export → `ueba detect --to-es` → URL Kibana |
 
+### 13.4bis Notification des alertes critiques
+
+`scripts/notify_critical.py` pousse les alertes `risk_level:CRITIQUE` récentes vers
+un webhook (`UEBA_WEBHOOK`, format compatible Slack/Mattermost/Teams) — sinon mode
+dry-run. En production, préférer **Kibana Alerting** (règle sur `risk_level.keyword`
+→ connecteur natif). Voir [`docs/deployment.md`](docs/deployment.md).
+
+```bash
+UEBA_WEBHOOK=https://hooks.example/... make notify
+```
+
 ### 13.5 Surveillance continue (cron / systemd)
 
-`scripts/continuous_detect.sh` enchaîne export → détection → indexation toutes les
-30 minutes. Deux modes de déploiement (détaillés dans [`docs/deployment.md`](docs/deployment.md)) :
+`scripts/continuous_detect.sh` enchaîne export → détection → indexation →
+notification → **heartbeat** (`ueba-heartbeat`) toutes les 30 minutes, avec
+dégradation gracieuse. Deux modes de déploiement (détaillés dans
+[`docs/deployment.md`](docs/deployment.md)) :
 
 ```bash
 # Option A — crontab
 */30 * * * * /bin/bash ~/ueba-portable/scripts/continuous_detect.sh
 
-# Option B — systemd (recommandé)
-sudo cp ueba-detect.service ueba-detect.timer /etc/systemd/system/
+# Option B — systemd (recommandé) : timer + OnFailure (dead-man-switch)
+sudo cp ueba-detect.service ueba-detect.timer ueba-detect-failure.service /etc/systemd/system/
 sudo systemctl enable --now ueba-detect.timer
 ```
+
+### 13.6 Intégrité & sécurité
+
+Les modèles `.joblib` reposant sur `pickle`, `ueba detect` **vérifie l'empreinte
+SHA-256** (`<modèle>.sha256`) avant chargement (`ueba.infrastructure.integrity`).
+`make train` génère ce sidecar automatiquement. Le client ES
+(`ueba.infrastructure.es_client`) utilise **HTTPS par défaut**, supporte les **clés
+API** (`ES_API_KEY`, privilèges restreints recommandés) et applique des **retries**
+sur erreurs transitoires.
 
 ---
 
@@ -568,33 +616,34 @@ ueba-portable/
 │   │   └── mitre.py       # MitreMapper (heuristiques + signal SIEM + population)
 │   ├── scoring/
 │   │   ├── rolling_baseline.py  # RollingBaselineEngine (baseline glissante N-day)
-│   │   └── risk.py        # RiskScorer + RiskLevel (score 0–100, niveaux d'alerte)
+│   │   └── risk.py        # RiskScorer + RiskLevel + contexte MITRE + recommended_action
 │   ├── metrics/
-│   │   └── mttd.py        # MTTDCalculator + MTTDReport (Mean Time To Detect)
-│   ├── infrastructure/    # I/O, config YAML/.env, logging, ElasticWriter
+│   │   ├── mttd.py        # MTTDCalculator + MTTDReport (Mean Time To Detect)
+│   │   └── classification.py  # ConfusionMatrix : precision/recall/F1/FPR
+│   ├── infrastructure/    # I/O, config, logging, ElasticWriter
+│   │   ├── es_client.py   # Client ES unifié (HTTPS, API key, retry)
+│   │   └── integrity.py   # Vérification SHA-256 des modèles (anti-pickle)
 │   ├── cli.py             # Entrée CLI `ueba run` / `train` / `detect` / `version`
-│   └── pipeline.py        # UEBAPipeline (orchestration extract → fit → predict, global/per-user)
+│   └── pipeline.py        # UEBAPipeline (orchestration extract → fit → predict)
 ├── tests/
-│   ├── unit/              # Tests unitaires (dont test_mttd.py, test_risk_scoring.py)
-│   └── integration/
-│       ├── fixtures/
-│       │   └── sample_logs.csv   # 103 événements synthétiques, 7 utilisateurs
-│       ├── test_password_spray_detection.py
-│       └── test_pipeline.py      # Pipeline bout-en-bout (global + per-user)
-│   # 211 tests au total, couverture globale 97 %
-├── notebooks/             # Exploration, analyse des features, visualisation
+│   ├── unit/              # Tests unitaires (mttd, risk, es_client, integrity, infra…)
+│   └── integration/       # Password spray + pipeline bout-en-bout
+│   # 259 tests au total, couverture globale 94 % (réelle)
 ├── scripts/               # Pipeline + exploitation SOC :
-│   ├── calculate_mttd.py        # MTTD depuis ES → index ueba-mttd
-│   ├── enrich_risk_levels.py    # risk_score + risk_level sur ueba-anomalies-*
+│   ├── setup_es.py              # Provisionnement ES (ILM + index templates)
+│   ├── calculate_mttd.py        # MTTD par vague → index ueba-mttd (idempotent)
+│   ├── enrich_risk_levels.py    # risk_score/level/action sur ueba-anomalies-*
 │   ├── export_recent_logs.py    # wazuh-alerts-* → CSV WazuhAdapter
+│   ├── notify_critical.py       # Alertes CRITIQUE → webhook (SOC)
 │   ├── simulate_attack.ps1      # Password spraying T1110.003 (labo)
 │   ├── demo_soutenance.sh       # Démo bout-en-bout
-│   └── continuous_detect.sh     # Surveillance continue (cron/systemd)
+│   └── continuous_detect.sh     # Surveillance continue (+ heartbeat)
 ├── docs/
 │   ├── kibana/            # Dashboards Lens + générateurs + enrich_mitre.sh
-│   └── deployment.md      # Déploiement, cron, systemd
-├── ueba-detect.service    # Unité systemd (surveillance continue)
-├── ueba-detect.timer      # Timer systemd (toutes les 30 min)
+│   ├── deployment.md      # Déploiement, cron, systemd, ILM
+│   └── AUDIT.md           # Audit niveau ingénieur SOC (constats + remédiation)
+├── Makefile               # Orchestration (setup-es/train/detect/enrich/mttd/notify)
+├── ueba-detect.service / .timer / -failure.service  # systemd (+ OnFailure)
 ├── .github/workflows/     # CI GitHub Actions (Python 3.10/3.11/3.12)
 ├── pyproject.toml         # Dépendances Poetry + config outils
 └── .env.example           # Template de configuration (à copier en .env)

@@ -124,13 +124,28 @@ ES_PASSWORD=VOTRE_MOT_DE_PASSE
 ES_INDEX_PREFIX=ueba-anomalies
 ```
 
-### Lecture directe depuis Elasticsearch (optionnel)
+### Authentification par clé API (recommandé) et HTTPS
+
+Le client ES (`ueba.infrastructure.es_client.ESClient`) utilise **HTTPS par défaut**
+et supporte une **clé API** à privilèges restreints, à préférer au superutilisateur
+`elastic` en production :
+
+```dotenv
+ES_HOST=https://soc-server:9200
+ES_API_KEY=<clé encodée>     # prioritaire sur ES_USERNAME/ES_PASSWORD
+ES_VERIFY_SSL=true           # false uniquement en labo (cert auto-signé)
+```
+
+Créer une clé restreinte : `read` sur `wazuh-alerts-*` + `write`/`create_index` sur
+`ueba-*` uniquement.
+
+### Lecture directe depuis Elasticsearch
 
 ```python
-from ueba.adapters.elasticsearch_api import ElasticsearchReader
+from ueba.infrastructure.es_client import ESClient
 
-reader = ElasticsearchReader.from_env()
-records = reader.fetch(index="wazuh-alerts-*", hours=24)
+client = ESClient.from_env(".env")
+resp = client.search("wazuh-alerts-*", {"size": 100, "query": {"match_all": {}}})
 ```
 
 ---

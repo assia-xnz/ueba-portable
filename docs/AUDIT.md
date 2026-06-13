@@ -115,3 +115,38 @@ Outils (réels) : **211 tests ✓**, ruff `All checks passed`, mypy strict `0 er
 **Phase 3 — Sécurité :** SEC-02/03/04 HTTPS+TLS+API keys · SEC-11 intégrité joblib · SEC-09 upsert ciblé · SEC-01 droits.
 
 **Phase 4 — Qualité & dette :** C1/C2/C3 couverture honnête + tests + code mort · S1 client ES partagé · S2 mypy scripts · SOC-14 poetry.lock · SOC-13 Makefile.
+
+---
+
+## Statut de remédiation (mise à jour)
+
+| Constat | Statut | Comment |
+|---|---|---|
+| A1 MTTD une seule vague | ✅ Corrigé | `calculate_mttd.py` calcule par vague (13 & 16 mai) : 14.9 / 74.9 / global 44.9 min |
+| A3 risk_score circulaire | ✅ Corrigé | `risk.py` : contexte de menace indépendant (criticité MITRE), reproductible |
+| A4 reporting déséquilibré | ✅ Outillé | `metrics/classification.py` (precision/recall/F1/FPR) + note honnête README §8 |
+| A2 fuite train/test | 🟡 Documenté | Note explicite README §8 ; protocole `train`/`detect` sans fuite recommandé |
+| A5 jeux incohérents | 🟡 Documenté | Note README ; unification complète du jeu canonique restant à faire |
+| SOC-01 ILM | ✅ Corrigé | `setup_es.py` : politique ILM hot→delete |
+| SOC-02 mapping dynamique | ✅ Corrigé | `setup_es.py` : index templates explicites |
+| SOC-04 notification | ✅ Corrigé | `notify_critical.py` (webhook) + heartbeat ; doc Kibana Alerting |
+| SOC-06 RiskScorer live | ✅ Corrigé | `ElasticWriter` calcule risk_score/level/action à l'indexation |
+| SOC-07 robustesse ES | ✅ Corrigé | `ESClient` retry/backoff + erreurs typées ; dégradation gracieuse |
+| SOC-09 idempotence | ✅ Corrigé | `_id` déterministe (writer + MTTD) |
+| SOC-10 monitoring | ✅ Corrigé | heartbeat `ueba-heartbeat` + `OnFailure=` systemd + TimeoutStartSec |
+| SOC-13 orchestration | ✅ Corrigé | `Makefile` |
+| SOC-15/16 robustesse scripts | ✅ Corrigé | client ES partagé (gestion d'erreurs) |
+| SEC-02/03/04 HTTPS/TLS/API key | ✅ Corrigé | `ESClient` HTTPS par défaut + `ES_API_KEY` + contexte TLS |
+| SEC-08 injection CSV | ✅ Corrigé | `csv_safe()` + `flatten` borné |
+| SEC-09 DELETE index | ✅ Corrigé | upsert idempotent, plus de DELETE |
+| SEC-11 intégrité joblib | ✅ Corrigé | `integrity.py` (SHA-256) vérifié avant `joblib.load` |
+| C1 couverture flattée | ✅ Corrigé | omit resserré + pragmas réseau → 94 % réel |
+| C2 infra non testée | ✅ Corrigé | tests config/io/logging/es_client/integrity |
+| C3 code mort | ✅ Corrigé | `elasticsearch_api.py` supprimé |
+| S1 duplication | ✅ Corrigé | `ESClient`/`load_dotenv` partagés |
+| E1/G4 | ✅ Corrigé | `PackageNotFoundError` ; import `FEATURE_NAMES` |
+| SOC-11 logging branché | 🟡 Partiel | heartbeat/métriques ES en place ; remplacement complet des `print()` à finir |
+| SOC-14 poetry.lock | ⏳ À faire | poetry indisponible dans l'environnement ; à générer (`poetry lock`) |
+| SOC-18 CI (intégration ES, gitleaks) | ⏳ À faire | enrichir `.github/workflows/ci.yml` |
+| SOC-05 case management | ⏳ À faire | champs de triage / Kibana Cases |
+| B2/B3/B4/B5 (méthodo mineurs) | ⏳ À faire | améliorations détection (seuils, IP source) |
