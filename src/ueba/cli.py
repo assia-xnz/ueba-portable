@@ -110,6 +110,17 @@ def _add_mode_args(p: argparse.ArgumentParser) -> None:
             "adapté à une baseline propre). Plus bas = moins de faux positifs."
         ),
     )
+    p.add_argument(
+        "--default-deny",
+        dest="default_deny",
+        action="store_true",
+        default=False,
+        help=(
+            "Mode fail-safe : alerter par défaut sur tout utilisateur sans modèle "
+            "dédié. Désactivé par défaut car responsable de ~64%% des faux positifs "
+            "sans gain de recall (cf. docs/AUDIT.md). Activer pour une posture stricte."
+        ),
+    )
 
 
 def _add_run_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -169,6 +180,16 @@ def _add_detect_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser])
         choices=["wazuh", "elastic", "splunk", "qradar"],
         default="wazuh",
         help="Format source du SIEM (défaut : wazuh)",
+    )
+    detect_p.add_argument(
+        "--persistence",
+        type=int,
+        default=2,
+        help=(
+            "Filtre de persistance : nombre minimal de fenêtres anormales "
+            "consécutives pour conserver une alerte (défaut : 2, réduit fortement "
+            "les faux positifs isolés). 1 désactive le filtre."
+        ),
     )
     detect_p.add_argument(
         "--to-es",
@@ -261,7 +282,9 @@ def _cmd_detect(args: argparse.Namespace) -> int:
     from ueba.pipeline import UEBAPipeline
 
     pipeline = UEBAPipeline.load_model(str(model_path))
+    pipeline.set_persistence(getattr(args, "persistence", 2))
     print(f"[ueba] Mode          : {pipeline.mode}")
+    print(f"[ueba] Persistance   : ≥{getattr(args, 'persistence', 2)} fenêtre(s) consécutive(s)")
     print(f"[ueba] Modèle        : {model_path}")
     print(f"[ueba] Source        : {args.source}")
     print(f"[ueba] Fichier       : {input_path}")
@@ -298,6 +321,8 @@ def _build_pipeline(args: argparse.Namespace) -> UEBAPipeline:
         min_windows_per_user=getattr(args, "min_windows_per_user", 30),
         train_ratio=getattr(args, "train_ratio", 0.8),
         svm_nu=getattr(args, "svm_nu", 0.05),
+        default_deny=getattr(args, "default_deny", False),
+        persistence_min_consecutive=getattr(args, "persistence", 1),
     )
 
 

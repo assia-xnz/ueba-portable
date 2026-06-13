@@ -125,6 +125,7 @@ Outils (réels) : **211 tests ✓**, ruff `All checks passed`, mypy strict `0 er
 | A1 MTTD une seule vague | ✅ Corrigé | `calculate_mttd.py` calcule par vague (13 & 16 mai) : 14.9 / 74.9 / global 44.9 min |
 | A3 risk_score circulaire | ✅ Corrigé | `risk.py` : contexte de menace indépendant (criticité MITRE), reproductible |
 | A4 reporting déséquilibré | ✅ Outillé | `metrics/classification.py` (precision/recall/F1/FPR) + note honnête README §8 |
+| **FP rate élevé (31–38 %)** | ✅ Corrigé | Diagnostic (`evaluate_fp.py`) : 64 % des FP = default-deny. `--no-default-deny` + `PersistenceFilter` (persistance ≥2) → **FP 37,7 %→11,1 %, recall 100 % intact**. Défauts CLI mis à jour. |
 | A2 fuite train/test | 🟡 Documenté | Note explicite README §8 ; protocole `train`/`detect` sans fuite recommandé |
 | A5 jeux incohérents | 🟡 Documenté | Note README ; unification complète du jeu canonique restant à faire |
 | SOC-01 ILM | ✅ Corrigé | `setup_es.py` : politique ILM hot→delete |

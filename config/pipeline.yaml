@@ -52,6 +52,17 @@ ensemble:
   # Nombre minimum de votes "anomalie" parmi les 3 modèles pour déclencher une alerte
   majority_threshold: 2
 
+detection:
+  # Réduction des faux positifs (mesurée sur le dataset réel — voir docs/AUDIT.md
+  # et scripts/evaluate_fp.py). Ces valeurs sont les défauts de la CLI
+  # (`ueba train`/`ueba detect`).
+  # default_deny=false : ne plus auto-alerter les utilisateurs sans modèle dédié
+  #   (responsable de ~64% des FP, sans gain de recall). FP rate 37.7% -> 13.6%.
+  default_deny: false
+  # persistence_min_consecutive : n'alerter que sur >=N fenêtres anormales
+  #   consécutives (supprime les FP isolés). Combiné -> FP rate 11.1%, recall 100%.
+  persistence_min_consecutive: 2
+
 output:
   processed_dir: "data/processed"
   report_filename: "detection_report.json"

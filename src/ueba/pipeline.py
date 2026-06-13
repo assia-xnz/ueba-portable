@@ -116,6 +116,9 @@ class UEBAPipeline:
         svm_nu: float = 0.05,
         n_estimators: int = 200,
         majority_threshold: int = 2,
+        reconstruction_error_percentile: float = 95.0,
+        default_deny: bool = True,
+        persistence_min_consecutive: int = 1,
         random_state: int = 42,
     ) -> None:
         if ensemble_mode not in ("global", "per-user"):
@@ -130,6 +133,9 @@ class UEBAPipeline:
         self._svm_nu = svm_nu
         self._n_estimators = n_estimators
         self._majority_threshold = majority_threshold
+        self._reconstruction_error_percentile = reconstruction_error_percentile
+        self._default_deny = default_deny
+        self._persistence_min_consecutive = persistence_min_consecutive
         self._random_state = random_state
 
         self._engine = RollingBaselineEngine(
@@ -138,6 +144,16 @@ class UEBAPipeline:
             lookback_days=lookback_days,
         )
         self._ensemble: AnomalyEnsemble | PerUserAnomalyEnsemble | None = None
+
+    def set_persistence(self, min_consecutive: int) -> None:
+        """Règle le filtre de persistance appliqué à :meth:`predict` (1 = désactivé).
+
+        Utile après :meth:`load_model`, où le réglage de persistance n'est pas
+        porté par le modèle sérialisé mais décidé au moment de la détection.
+        """
+        if min_consecutive < 1:
+            raise ValueError("min_consecutive doit être supérieur ou égal à 1")
+        self._persistence_min_consecutive = min_consecutive
 
     @property
     def mode(self) -> EnsembleMode:
@@ -178,6 +194,7 @@ class UEBAPipeline:
             ensemble = AnomalyEnsemble(
                 n_estimators=self._n_estimators,
                 svm_nu=self._svm_nu,
+                reconstruction_error_percentile=self._reconstruction_error_percentile,
                 majority_threshold=self._majority_threshold,
                 random_state=self._random_state,
             )
@@ -190,6 +207,8 @@ class UEBAPipeline:
                 svm_nu=self._svm_nu,
                 n_estimators=self._n_estimators,
                 majority_threshold=self._majority_threshold,
+                reconstruction_error_percentile=self._reconstruction_error_percentile,
+                default_deny=self._default_deny,
                 random_state=self._random_state,
             )
             per_user.fit(vectors)
@@ -217,8 +236,19 @@ class UEBAPipeline:
             raise RuntimeError("Le pipeline doit être entraîné (fit) ou chargé avant predict")
 
         if isinstance(self._ensemble, AnomalyEnsemble):
-            return self._predict_global(self._ensemble, vectors)
-        return self._predict_per_user(self._ensemble, vectors)
+            records = self._predict_global(self._ensemble, vectors)
+        else:
+            records = self._predict_per_user(self._ensemble, vectors)
+
+        # Filtre de persistance : supprime les anomalies isolées (faux positifs
+        # typiques), conserve les séries (attaques persistantes).
+        if self._persistence_min_consecutive > 1:
+            from ueba.domain.persistence import PersistenceFilter
+
+            records = PersistenceFilter(min_consecutive=self._persistence_min_consecutive).apply(
+                records
+            )
+        return records
 
     def _predict_global(
         self, ensemble: AnomalyEnsemble, vectors: list[FeatureVector]

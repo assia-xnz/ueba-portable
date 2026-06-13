@@ -269,6 +269,27 @@ standards (`SYSTEM`, `LOCAL SERVICE`, `NETWORK SERVICE`) sont éliminés dans la
 avant toute extraction de feature. Ces comptes génèrent une activité légitime à très haute fréquence
 qui polluerait les baselines et produirait des alertes massives sans valeur opérationnelle.
 
+### Levier 4 — `default-deny` désactivé + filtre de persistance (mesuré)
+
+Une analyse empirique sans fuite (`scripts/evaluate_fp.py`, vérité terrain = vrais
+bursts d'échecs) a montré que **64 % des faux positifs provenaient du *default-deny*** —
+l'auto-alerte de tout compte sans modèle dédié (comptes bruit, entités sous-représentées) —
+**sans aucun gain de recall**. Deux réglages, désormais **défauts de la CLI**, corrigent cela :
+
+1. `--no-default-deny` (défaut) : ne plus auto-alerter les utilisateurs sans modèle.
+2. `--persistence 2` (défaut de `ueba detect`) : n'alerter que sur ≥ 2 fenêtres anormales
+   consécutives (le filtre `PersistenceFilter` supprime les anomalies isolées).
+
+| Configuration | Recall | Précision | FP rate | Recall opérationnel |
+|---|---|---|---|---|
+| baseline (default-deny on) | 100 % | 11 % | **37,7 %** | 24/24 |
+| sans default-deny | 100 % | 25,6 % | 13,6 % | 24/24 |
+| **sans default-deny + persistance ≥2** | **100 %** | **29,6 %** | **11,1 %** | **24/24** |
+
+→ **FP rate divisé par ~3,4 (37,7 % → 11,1 %), précision ×2,7, recall intact (100 %).**
+Pour une posture stricte (auto-alerte des entités jamais vues), réactiver avec
+`ueba train --default-deny`.
+
 ---
 
 ## 8. Modes d'apprentissage

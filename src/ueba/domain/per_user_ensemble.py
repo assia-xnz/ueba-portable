@@ -134,6 +134,7 @@ reconstruction_error_percentile, majority_threshold, random_state
         autoencoder_hidden_layers: tuple[int, ...] = (8, 4, 8),
         reconstruction_error_percentile: float = 95.0,
         majority_threshold: int = 2,
+        default_deny: bool = True,
         random_state: int = 42,
     ) -> None:
         if min_windows_per_user < 1:
@@ -143,6 +144,7 @@ reconstruction_error_percentile, majority_threshold, random_state
 
         self._min_windows_per_user = min_windows_per_user
         self._exclude_machine_accounts = exclude_machine_accounts
+        self._default_deny = default_deny
         self._train_ratio = train_ratio
         self._n_estimators = n_estimators
         self._svm_kernel = svm_kernel
@@ -283,9 +285,12 @@ reconstruction_error_percentile, majority_threshold, random_state
         for vector in vectors:
             ensemble = self._models.get(vector.user)
             if ensemble is None:
+                # Utilisateur sans modèle dédié : default-deny (alerte) si activé,
+                # sinon non-anomalie (réduit fortement les faux positifs sur les
+                # entités sous-représentées et les comptes non humains).
                 verdicts.append(
                     PerUserVerdict(
-                        is_anomaly=True,
+                        is_anomaly=self._default_deny,
                         user=vector.user,
                         used_model=UNKNOWN_MODEL_LABEL,
                         was_in_training=False,
@@ -334,6 +339,7 @@ reconstruction_error_percentile, majority_threshold, random_state
             "autoencoder_hidden_layers": self._autoencoder_hidden_layers,
             "reconstruction_error_percentile": self._reconstruction_error_percentile,
             "majority_threshold": self._majority_threshold,
+            "default_deny": self._default_deny,
             "random_state": self._random_state,
         }
 
