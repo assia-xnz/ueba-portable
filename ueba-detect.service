@@ -1,0 +1,24 @@
+[Unit]
+# Surveillance continue UEBA — détection d'anomalies comportementales.
+# Service de type "oneshot" déclenché périodiquement par ueba-detect.timer.
+Description=UEBA continuous anomaly detection
+Documentation=https://github.com/assia-xnz/ueba-portable
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Adapter User et les chemins à votre environnement de déploiement.
+User=soc
+WorkingDirectory=/home/soc/ueba-portable
+EnvironmentFile=/home/soc/ueba-portable/.env
+Environment=UEBA_HOME=/home/soc/ueba-portable
+Environment=MODEL_PATH=/home/soc/ueba-portable/models/ueba-model.joblib
+Environment=LOG_FILE=/var/log/ueba/detect.log
+ExecStart=/bin/bash /home/soc/ueba-portable/scripts/continuous_detect.sh
+# Durcissement minimal.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -73,6 +73,45 @@ comportement, nouveaux comptes), relancer `train`.
 
 ---
 
+## Surveillance continue (amélioration 4)
+
+Le script `scripts/continuous_detect.sh` enchaîne, à chaque cycle, l'export des
+logs Wazuh récents (35 min, léger recouvrement), la détection UEBA et
+l'indexation des anomalies dans Elasticsearch. Toutes les sorties sont
+horodatées dans `/var/log/ueba/detect.log` (repli local si ce chemin n'est pas
+accessible).
+
+### Option A — crontab (toutes les 30 minutes)
+
+```cron
+# Crontab à configurer (crontab -e) sur soc-server
+*/30 * * * * /bin/bash ~/ueba-portable/scripts/continuous_detect.sh
+```
+
+Variables surchargeables : `MODEL_PATH`, `WINDOW_MIN`, `LOG_FILE`, `UEBA_HOME`.
+
+### Option B — service + timer systemd (recommandé en production)
+
+Les unités `ueba-detect.service` (type *oneshot*) et `ueba-detect.timer`
+(déclenchement toutes les 30 min) sont fournies à la racine du dépôt. Adapter
+`User=` et les chemins, puis :
+
+```bash
+sudo cp ueba-detect.service ueba-detect.timer /etc/systemd/system/
+sudo mkdir -p /var/log/ueba && sudo chown soc:soc /var/log/ueba
+sudo systemctl daemon-reload
+sudo systemctl enable --now ueba-detect.timer
+
+# Vérifications
+systemctl list-timers ueba-detect.timer      # prochain déclenchement
+journalctl -u ueba-detect.service -f         # logs en direct
+```
+
+Le timer est `Persistent=true` : un cycle manqué (machine éteinte) est rattrapé
+au redémarrage.
+
+---
+
 ## Configuration Elasticsearch (`.env`)
 
 `--to-es` lit la connexion depuis l'environnement, ou un fichier `.env` placé

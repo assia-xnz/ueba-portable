@@ -1,0 +1,14 @@
+[Unit]
+# Déclencheur périodique du service ueba-detect.service (toutes les 30 minutes).
+Description=Run UEBA continuous detection every 30 minutes
+Documentation=https://github.com/assia-xnz/ueba-portable
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=1min
+Persistent=true
+Unit=ueba-detect.service
+
+[Install]
+WantedBy=timers.target
