@@ -542,10 +542,7 @@ objs.append(
 # ── Bandeau d'en-tête (markdown) ──
 _HEADER_MD = (
     "## 🛡️ UEBA — SOC Operations Console\n"
-    "**Détection comportementale** · campagne *password spraying* MITRE **T1110.003** "
-    "(13 & 16 mai 2026) · 7 utilisateurs ciblés.\n\n"
-    "**Légende risque :** 🔴 CRITIQUE (≥80) · 🟠 ÉLEVÉ (≥60) · 🟡 MOYEN (≥40) · ⚪ FAIBLE — "
-    "traiter la *file de triage* du haut vers le bas. Plage : 11–21 mai 2026."
+    "Détection comportementale · MITRE ATT&CK T1110.003"
 )
 objs.append(
     {
@@ -580,24 +577,24 @@ objs.append(
 # ───────────────────────── dashboard (console SOC) ─────────────────────────
 # (id, type, x, y, w, h) — grille 48 colonnes, pyramide inversée.
 panels = [
-    ("ueba-v4-header", "visualization", 0, 0, 48, 5),
+    ("ueba-v4-header", "visualization", 0, 0, 48, 3),
     # KPI exécutifs
-    ("ueba-v4-kpi-entities", "lens", 0, 5, 12, 8),
-    ("ueba-v4-kpi-crit-entities", "lens", 12, 5, 12, 8),
-    ("ueba-v3-kpi-mttd", "lens", 24, 5, 12, 8),
-    ("ueba-v3-kpi-anomalies", "lens", 36, 5, 12, 8),
+    ("ueba-v4-kpi-entities", "lens", 0, 3, 12, 8),
+    ("ueba-v4-kpi-crit-entities", "lens", 12, 3, 12, 8),
+    ("ueba-v3-kpi-mttd", "lens", 24, 3, 12, 8),
+    ("ueba-v3-kpi-anomalies", "lens", 36, 3, 12, 8),
     # File de triage (centerpiece)
-    ("ueba-v4-entity-table", "lens", 0, 13, 48, 18),
+    ("ueba-v4-entity-table", "lens", 0, 11, 48, 18),
     # Contexte temporel
-    ("ueba-v3-timeline", "lens", 0, 31, 32, 12),
-    ("ueba-v3-heatmap", "lens", 32, 31, 16, 12),
+    ("ueba-v3-timeline", "lens", 0, 29, 32, 12),
+    ("ueba-v3-heatmap", "lens", 32, 29, 16, 12),
     # Analytique
-    ("ueba-v3-risk-pie", "lens", 0, 43, 16, 14),
-    ("ueba-v3-mitre", "lens", 16, 43, 16, 14),
-    ("ueba-v3-topusers", "lens", 32, 43, 16, 14),
+    ("ueba-v3-risk-pie", "lens", 0, 41, 16, 14),
+    ("ueba-v3-mitre", "lens", 16, 41, 16, 14),
+    ("ueba-v3-topusers", "lens", 32, 41, 16, 14),
     # Détail
-    ("ueba-v3-alerts-table", "lens", 0, 57, 24, 14),
-    ("ueba-v3-mttd-table", "lens", 24, 57, 24, 14),
+    ("ueba-v3-alerts-table", "lens", 0, 55, 24, 14),
+    ("ueba-v3-mttd-table", "lens", 24, 55, 24, 14),
 ]
 panels_json, refs = [], []
 for i, (vid, vtype, x, y, w, h) in enumerate(panels, start=1):
