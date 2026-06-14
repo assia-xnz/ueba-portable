@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from ueba.infrastructure.es_client import ESClient  # noqa: E402
 from ueba.pipeline import AnomalyRecord  # noqa: E402
 from ueba.scoring.entity_risk import aggregate_entities  # noqa: E402
+from ueba.scoring.risk import RiskLevel, recommended_action  # noqa: E402
 
 ANOM_INDEX = "ueba-anomalies-*"
 ENTITY_INDEX = "ueba-entity-alerts"
@@ -41,6 +42,7 @@ ENTITY_MAPPING = {
             "peak_votes": {"type": "integer"},
             "max_risk_score": {"type": "float"},
             "risk_level": {"type": "keyword"},
+            "recommended_action": {"type": "keyword"},
             "mitre_technique": {"type": "keyword"},
             "first_detection": {"type": "date"},
             "last_detection": {"type": "date"},
@@ -119,6 +121,7 @@ def main() -> int:
                     "peak_votes": a.peak_votes,
                     "max_risk_score": round(meta["max_risk"], 1),
                     "risk_level": meta["level"],
+                    "recommended_action": recommended_action(RiskLevel(meta["level"])),
                     "mitre_technique": meta["mitre"],
                     "first_detection": a.first_detection.isoformat(),
                     "last_detection": a.last_detection.isoformat(),

@@ -574,13 +574,14 @@ générés par script pour être reproductibles :
 |---|---|---|
 | `docs/kibana/ueba-dashboard-v2.ndjson` | « UEBA — SOC Dashboard » | 7 visualisations (timeline, KPIs, MITRE, top users, heatmap, table) |
 | `docs/kibana/ueba-dashboard-v3.ndjson` | « UEBA — SOC Dashboard v3 » | 12 visualisations = v2 **+** KPI MTTD, table MTTD, bar risk score, pie niveaux d'alerte, KPI users CRITIQUE |
+| `docs/kibana/ueba-dashboard-v4.ndjson` ⭐ | « UEBA — SOC Operations Console » | **Console SOC orientée triage** : bandeau d'en-tête, KPI exécutifs, **file de triage priorisée** (entités × jour, niveau + action recommandée), MITRE, **filtres interactifs** (niveau d'alerte, utilisateur) |
 
 ```bash
-# Génération (optionnel) puis import dans Kibana
-python docs/kibana/generate_dashboard_v3.py
+# Génération (optionnel) puis import dans Kibana (v4 = console SOC recommandée)
+python docs/kibana/generate_dashboard_v4.py
 curl -s -u "$ES_USERNAME:$ES_PASSWORD" \
   "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
-  -H "kbn-xsrf: true" --form file=@docs/kibana/ueba-dashboard-v3.ndjson
+  -H "kbn-xsrf: true" --form file=@docs/kibana/ueba-dashboard-v4.ndjson
 ```
 
 > Pré-requis données : rejouer `enrich_mitre.sh`, `enrich_risk_levels.py` et

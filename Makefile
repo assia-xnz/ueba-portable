@@ -64,8 +64,8 @@ precision:  ## Mesure précision/recall fenêtre vs entité (sans fuite)
 notify:  ## Pousse les alertes CRITIQUE récentes vers le webhook (UEBA_WEBHOOK)
 	$(PYTHON) scripts/notify_critical.py
 
-dashboards:  ## (Ré)génère les ndjson des dashboards Kibana
-	$(PYTHON) docs/kibana/generate_dashboard_v3.py
+dashboards:  ## (Ré)génère le ndjson de la console SOC (v4)
+	$(PYTHON) docs/kibana/generate_dashboard_v4.py
 
 demo:  ## Démonstration bout-en-bout
 	bash scripts/demo_soutenance.sh
