@@ -31,8 +31,10 @@ from ueba.metrics.mttd import MTTDCalculator  # noqa: E402
 
 TARGET_USERS = ["a.amrani", "l.idrissi", "l.mus", "y.ben", "n.alam", "s.ed", "k.alaa"]
 # Vagues de password spraying connues (campagne T1110.003).
+# Heures = pics réels de failed logons mesurés sur les données ES
+# (13 mai : pic de 130 à 10:30 ; 16 mai : pic de 140 à 18:00).
 WAVES = [
-    {"name": "vague1-13mai", "start": datetime(2026, 5, 13, 11, 0, 0)},
+    {"name": "vague1-13mai", "start": datetime(2026, 5, 13, 10, 30, 0)},
     {"name": "vague2-16mai", "start": datetime(2026, 5, 16, 18, 0, 0)},
 ]
 ANOM_INDEX = "ueba-anomalies-*"
