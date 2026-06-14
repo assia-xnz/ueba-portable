@@ -5,6 +5,11 @@ PYTHON ?= python3
 MODEL  ?= models/ueba-model.joblib
 BASELINE ?= data/raw/baseline.csv
 INPUT    ?= data/raw/recent_logs.csv
+# Seuil de fenêtres pour qu'un utilisateur obtienne un modèle dédié. 10 est requis
+# pour le recall 100% avec --no-default-deny (les entités sous-représentées comme
+# k.alaa doivent obtenir un modèle plutôt que de passer inaperçues). Cf. docs/AUDIT.md.
+MIN_WINDOWS ?= 10
+PERSISTENCE ?= 2
 
 .PHONY: help install test lint format type check setup-es train detect enrich mttd notify dashboards demo all-quality
 
@@ -33,14 +38,15 @@ check: lint format type test  ## Tous les contrôles qualité
 setup-es:  ## Provisionne ES (politique ILM + index templates)
 	$(PYTHON) scripts/setup_es.py
 
-train:  ## Entraîne le modèle per-user sur une baseline propre (BASELINE=...)
+train:  ## Entraîne le modèle per-user (config anti-FP validée : no-default-deny, min_windows=10)
 	poetry run ueba train --input $(BASELINE) --mode per-user --train-ratio 1.0 \
-		--save-model $(MODEL)
+		--min-windows-per-user $(MIN_WINDOWS) --save-model $(MODEL)
 	$(PYTHON) -c "from ueba.infrastructure.integrity import write_checksum; \
 		print('checksum ->', write_checksum('$(MODEL)'))"
 
-detect:  ## Détecte sur des logs récents et indexe dans ES (INPUT=...)
-	poetry run ueba detect --input $(INPUT) --load-model $(MODEL) --to-es
+detect:  ## Détecte sur des logs récents et indexe dans ES (INPUT=..., persistance anti-FP)
+	poetry run ueba detect --input $(INPUT) --load-model $(MODEL) \
+		--persistence $(PERSISTENCE) --to-es
 
 enrich:  ## Enrichit les anomalies (MITRE + risk_score/level)
 	bash docs/kibana/enrich_mitre.sh
