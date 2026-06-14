@@ -11,7 +11,7 @@ INPUT    ?= data/raw/recent_logs.csv
 MIN_WINDOWS ?= 10
 PERSISTENCE ?= 2
 
-.PHONY: help install test lint format type check setup-es train detect enrich mttd notify dashboards demo all-quality
+.PHONY: help install test lint format type check setup-es train detect enrich mttd entities precision notify dashboards demo all-quality
 
 help:  ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -54,6 +54,12 @@ enrich:  ## Enrichit les anomalies (MITRE + risk_score/level)
 
 mttd:  ## Calcule le MTTD par vague et indexe ueba-mttd
 	$(PYTHON) scripts/calculate_mttd.py
+
+entities:  ## Agrège les anomalies par entité (user×jour) -> ueba-entity-alerts (précision)
+	$(PYTHON) scripts/aggregate_entities.py
+
+precision:  ## Mesure précision/recall fenêtre vs entité (sans fuite)
+	$(PYTHON) scripts/evaluate_precision.py
 
 notify:  ## Pousse les alertes CRITIQUE récentes vers le webhook (UEBA_WEBHOOK)
 	$(PYTHON) scripts/notify_critical.py

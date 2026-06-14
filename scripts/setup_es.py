@@ -88,7 +88,7 @@ def anomalies_template() -> dict:
 def ops_template() -> dict:
     """Template pour les index opérationnels (mttd, métriques, heartbeat)."""
     return {
-        "index_patterns": ["ueba-mttd", "ueba-metrics", "ueba-heartbeat"],
+        "index_patterns": ["ueba-mttd", "ueba-metrics", "ueba-heartbeat", "ueba-entity-alerts"],
         "template": {
             "settings": {"number_of_replicas": 0},
             "mappings": {

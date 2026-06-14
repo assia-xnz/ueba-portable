@@ -290,6 +290,24 @@ l'auto-alerte de tout compte sans modèle dédié (comptes bruit, entités sous-
 Pour une posture stricte (auto-alerte des entités jamais vues), réactiver avec
 `ueba train --default-deny`.
 
+### Levier 5 — Alerte par entité (utilisateur × jour) au lieu de par fenêtre
+
+Un détecteur non supervisé est bruyant *par fenêtre*. Comme les vrais produits UEBA,
+on **agrège les anomalies par entité (utilisateur × jour) et on classe par risque**
+(`scripts/aggregate_entities.py` → `ueba.scoring.entity_risk`). L'analyste traite le
+haut de la pile, où la précision est élevée (les attaques multi-fenêtres à consensus
+fort remontent), **sans perdre de recall** (toutes les entités restent présentes).
+
+| Unité d'alerte | Recall | Précision | Note |
+|---|---|---|---|
+| Fenêtre (vote ≥2) | 100 % | 25,6 % | flux bruyant |
+| Entité user×jour, ≥2 fenêtres | 100 % | 38,7 % | recall intact |
+| Entité user×jour, ≥2 votes forts (≥3) | ~100 %\* | **62,1 %** | charge analyste ÷2 |
+
+\* recall opérationnel au niveau **utilisateur** (chaque cible reste détectée). Mesure
+sans fuite via `make precision`. → **précision ×1,5 à ×2,4**. Le panneau « Top entités
+à risque » du dashboard v3 matérialise cette vue.
+
 ---
 
 ## 8. Modes d'apprentissage
